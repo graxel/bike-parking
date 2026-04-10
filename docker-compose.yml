@@ -1,22 +1,12 @@
-# --- Docker Compose Composition: The Multi-Container Orchestra ---
-# This file is the 'map' that tells Docker how to run your whole system.
-
 services:
-  # ----------------------------------------------------
-  # 1. The FastAPI Web Application
-  # ----------------------------------------------------
+
   app:
     build: .
     ports:
       - "8000:8000"
-    # Load all variables from your streamlined .env file
     env_file: .env
-    # Using 'fastapi run' (new in FastAPI 0.135+)
     command: ["fastapi", "run", "app/main.py", "--port", "8000", "--host", "0.0.0.0"]
 
-  # ----------------------------------------------------
-  # 2. Airflow Initialization (One-Time Setup)
-  # ----------------------------------------------------
   airflow-init:
     build: .
     env_file: .env
@@ -35,10 +25,6 @@ services:
         # Ensure log templates are seeded via robust script
         python3 data_pipeline/init_airflow_db.py
 
-
-  # ----------------------------------------------------
-  # 3. Airflow Webserver (The UI)
-  # ----------------------------------------------------
   airflow-webserver:
     build: .
     ports:
@@ -50,12 +36,10 @@ services:
         condition: service_completed_successfully
     command: ["airflow", "webserver"]
 
-  # ----------------------------------------------------
-  # 4. Airflow Scheduler (The Engine)
-  # ----------------------------------------------------
   airflow-scheduler:
     build: .
     env_file: .env
+    # Wait for the database schema to be ready
     depends_on:
       airflow-init:
         condition: service_completed_successfully

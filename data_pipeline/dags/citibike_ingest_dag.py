@@ -25,7 +25,8 @@ with DAG(
     description='Fetch Citi Bike GBFS data every minute',
     schedule_interval='* * * * *',
     catchup=False,
-    max_active_runs=1
+    max_active_runs=1,
+    is_paused_upon_creation=False
 ) as dag:
 
     ingest_task = BashOperator(
@@ -34,10 +35,11 @@ with DAG(
         execution_timeout=timedelta(seconds=20),
     )
 
-    dbt_run_task = BashOperator(
-        task_id='run_dbt_models',
-        bash_command=f'cd {PROJECT_ROOT}/data_pipeline/dbt && exec {VENV_DBT} run --profiles-dir .',
-        execution_timeout=timedelta(seconds=35),
-    )
+    # dbt_run_task = BashOperator(
+    #     task_id='run_dbt_models',
+    #     bash_command=f'cd {PROJECT_ROOT}/data_pipeline/dbt && exec {VENV_DBT} run --profiles-dir .',
+    #     execution_timeout=timedelta(seconds=35),
+    # )
 
-    ingest_task >> dbt_run_task
+    # ingest_task >> dbt_run_task
+    ingest_task

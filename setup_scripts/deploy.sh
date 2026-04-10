@@ -29,5 +29,3 @@ echo "==> Running airflow-init"
 docker compose run --rm airflow-init
 
 echo "==> *** Deploy complete! ***"
-echo "==> Unpausing Airflow DAG"
-docker compose exec -T airflow-scheduler airflow dags unpause citibike_ingestion
