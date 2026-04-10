@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Citi Bike Station Finder</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body, html { margin: 0; padding: 0; height: 100vh; font-family: 'Inter', sans-serif; background: #0f172a; }
+        #map { height: 100%; width: 100%; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .popup-content { font-size: 14px; line-height: 1.5; color: #1e293b; min-width: 200px; }
+        .popup-content h3 { margin: 0 0 8px 0; font-size: 16px; color: #0f172a; }
+        .copy-box {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: monospace;
+            display: block;
+            margin-top: 10px;
+            text-align: center;
+            font-weight: 600;
+            color: #0369a1;
+            transition: all 0.2s;
+        }
+        .copy-box:hover { background: #e0f2fe; border-color: #7dd3fc; }
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 50px;
+            z-index: 1000;
+            background: #ffffff;
+            padding: 12px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            color: #0f172a;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s;
+        }
+        .back-btn:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-btn">← Back to Dashboard</a>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        // Initialize map centered roughly on NYC
+        const map = L.map('map').setView([40.7128, -74.0060], 12);
+        
+        // Carto Light tiles
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        }).addTo(map);
+
+        // Fetch GBFS feed
+        fetch('https://gbfs.citibikenyc.com/gbfs/en/station_information.json')
+            .then(res => res.json())
+            .then(data => {
+                const stations = data.data.stations;
+                stations.forEach(s => {
+                    const marker = L.marker([s.lat, s.lon]).addTo(map);
+                    
+                    const html = `
+                        <div class="popup-content">
+                            <h3>${s.name}</h3>
+                            Capacity: <b>${s.capacity} docks</b><br>
+                            Click below to copy UUID for groups.yaml:
+                            <code class="copy-box" onclick="navigator.clipboard.writeText('${s.station_id}'); this.innerText='Copied!'; setTimeout(() => this.innerText='${s.station_id}', 2000);">${s.station_id}</code>
+                        </div>
+                    `;
+                    marker.bindPopup(html);
+                });
+            })
+            .catch(err => console.error("Could not fetch station data:", err));
+    </script>
+</body>
+</html>

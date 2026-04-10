@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citi Bike Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="glass-header">
+            <div class="header-logo">🚲</div>
+            <h1>Citi Bike Parking</h1>
+            <p class="subtitle">Live & 8-Day Predictive Analytics</p>
+            <br>
+            <a href="map.html" style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--text-primary); text-decoration: none; background: rgba(0,0,0,0.2); padding: 0.75rem 1.25rem; border-radius: 8px; border: 1px solid var(--surface-border); transition: 0.2s;">🗺️ Find Station UUID Map</a>
+        </header>
+
+        <main id="dashboard" class="dashboard-grid">
+            <div class="loader" id="loader">Fetching live station data and models...</div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
