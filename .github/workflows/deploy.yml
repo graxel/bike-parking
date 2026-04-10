@@ -4,14 +4,14 @@ on:
   push:
     branches:
       - main
-      - qa
+      - test
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: >-
       ${{ github.ref_name == 'main' && 'prod' ||
-          github.ref_name == 'qa'   && 'qa'   ||
+          github.ref_name == 'test' && 'qa'   ||
           'default' }}
     steps:
       - name: Checkout
