@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+.env
+
+.DS_Store
+
+.airflow
+
+data_pipeline/dbt/.user.yml
+data_pipeline/dbt/target
+data_pipeline/dbt/logs
+
+scratch
