@@ -1,0 +1,20 @@
+groups:
+  - name: Home
+    stations:
+      - "66de482a-0aca-11e7-82f6-3863bb44ef7c"
+      - "66de4897-0aca-11e7-82f6-3863bb44ef7c"
+      - "66de1295-0aca-11e7-82f6-3863bb44ef7c"
+
+  - name: Subway
+    stations:
+      - "66de4078-0aca-11e7-82f6-3863bb44ef7c"
+
+  - name: Work
+    stations:
+      - "90c35466-db3c-4b0d-993e-6e92883773b4"
+      - "66db2afe-0aca-11e7-82f6-3863bb44ef7c"
+
+  - name: Gym
+    stations:
+      - "66de4078-0aca-11e7-82f6-3863bb44ef7c"
+
