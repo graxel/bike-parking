@@ -21,6 +21,9 @@ OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
 AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://\${DB_USER}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}?options=-csearch_path%3Dairflow,public
 AIRFLOW__DATABASE__SQL_ALCHEMY_SCHEMA=airflow
 AIRFLOW__CORE__EXECUTOR=LocalExecutor
+
+APP_PORT=8004
+AIRFLOW_WEBSERVER_PORT=8080
 EOF
 
 echo "==> Building and starting containers"
