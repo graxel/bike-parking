@@ -3,9 +3,9 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "${APP_PORT}:${APP_PORT}"
     env_file: .env
-    command: ["fastapi", "run", "app/main.py", "--port", "8000", "--host", "0.0.0.0"]
+    command: ["fastapi", "run", "app/main.py", "--port", "${APP_PORT}", "--host", "0.0.0.0"]
 
   airflow-init:
     build: .
@@ -28,7 +28,7 @@ services:
   airflow-webserver:
     build: .
     ports:
-      - "8080:8080"
+      - "${AIRFLOW_WEBSERVER_PORT}:${AIRFLOW_WEBSERVER_PORT}"
     env_file: .env
     # Wait for the database schema to be ready
     depends_on:
