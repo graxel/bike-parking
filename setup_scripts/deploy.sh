@@ -13,6 +13,10 @@ DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
 EOF
 
+echo "==> Refreshing .env for Docker Compose"
+# Create the definitive .env from our two sources
+cat settings.env secrets.env > .env
+
 echo "==> Building and starting containers"
 docker compose up --build -d
 
