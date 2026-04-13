@@ -1,15 +1,20 @@
+env_file:
+  - settings.env
+  - secrets.env
+
 services:
 
   app:
     build: .
     ports:
       - "${APP_PORT}:${APP_PORT}"
-    env_file: .env
     command: ["fastapi", "run", "app/main.py", "--port", "${APP_PORT}", "--host", "0.0.0.0"]
 
   airflow-init:
     build: .
-    env_file: .env
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
+      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
     command: 
       - "/bin/bash"
       - "-c"
@@ -29,7 +34,9 @@ services:
     build: .
     ports:
       - "${AIRFLOW_WEBSERVER_PORT}:${AIRFLOW_WEBSERVER_PORT}"
-    env_file: .env
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
+      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
     # Wait for the database schema to be ready
     depends_on:
       airflow-init:
@@ -38,7 +45,9 @@ services:
 
   airflow-scheduler:
     build: .
-    env_file: .env
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
+      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
     # Wait for the database schema to be ready
     depends_on:
       airflow-init:

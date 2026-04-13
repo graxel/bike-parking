@@ -26,4 +26,4 @@ COPY . .
 ENV PATH="/bike-parking/.venv/bin:$PATH"
 
 # Default command (can be overridden by docker-compose)
-CMD ["fastapi", "run", "app/main.py", "--port", "${APP_PORT}", "--host", "0.0.0.0"]
+CMD ["fastapi", "run", "app/main.py", "--port", "8004", "--host", "0.0.0.0"]

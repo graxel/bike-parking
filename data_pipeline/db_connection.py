@@ -4,7 +4,9 @@ import logging
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+load_dotenv("settings.env")
+load_dotenv("secrets.env", override=True)
+
 
 logger = logging.getLogger(__name__)
 
