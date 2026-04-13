@@ -13,7 +13,7 @@ DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
 EOF
 
- echo "==> Building and starting containers"
+echo "==> Building and starting containers"
 docker compose up --build -d
 
 echo "==> Running airflow-init"
