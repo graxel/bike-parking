@@ -15,10 +15,11 @@ secrets.env
 
 .DS_Store
 
-.airflow
+airflow
 
 data_pipeline/dbt/.user.yml
 data_pipeline/dbt/target
 data_pipeline/dbt/logs
 
 scratch
+.ipynb_checkpoints
