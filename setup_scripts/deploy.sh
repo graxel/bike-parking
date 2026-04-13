@@ -4,27 +4,19 @@
 # Env vars are injected by appleboy/ssh-action via the 'envs' field.
 set -euo pipefail
 
-echo "==> Writing .env"
-cat > .env <<EOF
+echo "==> Writing secrets.env"
+cat > secrets.env <<EOF
 DB_NAME=${DB_NAME}
 DB_HOST=${DB_HOST}
 DB_PORT=${DB_PORT}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
-
-AIRFLOW_HOME=./.airflow
-AIRFLOW__CORE__DAGS_FOLDER=./data_pipeline/dags
-AIRFLOW__CORE__LOAD_EXAMPLES=False
-AIRFLOW__METRICS__TIMER_UNIT_CONSISTENCY=true
-OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-
-AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://\${DB_USER}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}?options=-csearch_path%3Dairflow,public
-AIRFLOW__DATABASE__SQL_ALCHEMY_SCHEMA=airflow
-AIRFLOW__CORE__EXECUTOR=LocalExecutor
-
-APP_PORT=8004
-AIRFLOW_WEBSERVER_PORT=8080
+AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY}
 EOF
+
+echo "==> Refreshing .env for Docker Compose"
+# Create the definitive .env from our two sources
+cat settings.env secrets.env > .env
 
 echo "==> Building and starting containers"
 docker compose up --build -d

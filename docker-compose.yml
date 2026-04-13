@@ -4,12 +4,16 @@ services:
     build: .
     ports:
       - "${APP_PORT}:${APP_PORT}"
-    env_file: .env
     command: ["fastapi", "run", "app/main.py", "--port", "${APP_PORT}", "--host", "0.0.0.0"]
 
   airflow-init:
     build: .
     env_file: .env
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
+      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
+    volumes:
+      - ./airflow/logs:/bike-parking/airflow/logs
     command: 
       - "/bin/bash"
       - "-c"
@@ -27,18 +31,29 @@ services:
 
   airflow-webserver:
     build: .
+    env_file: .env
     ports:
       - "${AIRFLOW_WEBSERVER_PORT}:${AIRFLOW_WEBSERVER_PORT}"
-    env_file: .env
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
+      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
+    volumes:
+      - ./airflow/logs:/bike-parking/airflow/logs
     # Wait for the database schema to be ready
     depends_on:
       airflow-init:
         condition: service_completed_successfully
-    command: ["airflow", "webserver"]
+    command: ["airflow", "webserver", "--port", "${AIRFLOW_WEBSERVER_PORT}"]
 
   airflow-scheduler:
     build: .
+    hostname: airflow-scheduler
     env_file: .env
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
+      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
+    volumes:
+      - ./airflow/logs:/bike-parking/airflow/logs
     # Wait for the database schema to be ready
     depends_on:
       airflow-init:

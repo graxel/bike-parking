@@ -28,12 +28,13 @@ jobs:
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          AIRFLOW__WEBSERVER__SECRET_KEY: ${{ secrets.AIRFLOW__WEBSERVER__SECRET_KEY }}
         with:
           host: ${{ secrets.SERVER_IP_ADDR }}
           port: ${{ secrets.SERVER_SSH_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GIT_REPO,REPO_NAME,GITHUB_REF_NAME,DB_NAME,DB_HOST,DB_PORT,DB_USER,DB_PASSWORD
+          envs: GIT_REPO,REPO_NAME,GITHUB_REF_NAME,DB_NAME,DB_HOST,DB_PORT,DB_USER,DB_PASSWORD,AIRFLOW__WEBSERVER__SECRET_KEY
           script: |
             cd ~/"$REPO_NAME" || \
             git clone "https://github.com/$GIT_REPO" ~/"$REPO_NAME" && \
