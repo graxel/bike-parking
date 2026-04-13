@@ -9,7 +9,9 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv("settings.env")
+load_dotenv("secrets.env", override=True)
+
 
 def get_db_connection():
     conn = psycopg2.connect(
