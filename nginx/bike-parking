@@ -11,7 +11,7 @@
 #   qa   → /bike-parking/beta
 
 
-# ─── Public endpoints ───────────────────────────────────────────
+# --- Public endpoints -------------------------------------------
 
 # History API (current availability + history)
 location __PREFIX__/history/ {
@@ -77,7 +77,7 @@ location __PREFIX__/panic/ {
 }
 
 
-# ─── Internal-only endpoints (restrict to localhost / VPN) ───────
+# --- Internal-only endpoints (restrict to localhost / VPN) -------
 
 # Health check (internal)
 location __PREFIX__/health/ {
