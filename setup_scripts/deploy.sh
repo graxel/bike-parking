@@ -4,6 +4,15 @@
 # Env vars are injected by appleboy/ssh-action via the 'envs' field.
 set -euo pipefail
 
+# ─── Determine environment from branch ──────────────────────────
+case "${GITHUB_REF_NAME}" in
+  main) PREFIX="/bike-parking"      ;;
+  test) PREFIX="/bike-parking/beta" ;;
+  *)    echo "Unknown branch: ${GITHUB_REF_NAME}" >&2; exit 1 ;;
+esac
+echo "==> Environment: ${GITHUB_REF_NAME} (prefix: ${PREFIX})"
+
+# ─── Write secrets.env ──────────────────────────────────────────
 echo "==> Writing secrets.env"
 cat > secrets.env <<EOF
 DB_NAME=${DB_NAME}
@@ -14,10 +23,25 @@ DB_PASSWORD=${DB_PASSWORD}
 AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY}
 EOF
 
+# ─── Build .env for Docker Compose ──────────────────────────────
 echo "==> Refreshing .env for Docker Compose"
-# Create the definitive .env from our two sources
 cat settings.env secrets.env > .env
 
+# ─── Install nginx config ──────────────────────────────────────
+NGINX_APPS_DIR="/etc/nginx/sites-available/apps"
+NGINX_CONF="bike-parking"
+
+echo "==> Installing nginx config (prefix: ${PREFIX})"
+sed "s|__PREFIX__|${PREFIX}|g" nginx/bike-parking \
+    | sudo tee "${NGINX_APPS_DIR}/${NGINX_CONF}" > /dev/null
+
+echo "==> Testing nginx config"
+sudo nginx -t
+
+echo "==> Reloading nginx"
+sudo systemctl reload nginx
+
+# ─── Build and start containers ─────────────────────────────────
 echo "==> Building and starting containers"
 docker compose up --build -d
 

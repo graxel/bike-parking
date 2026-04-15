@@ -1,0 +1,119 @@
+# Bike Parking: Citi Bike dock availability tracker
+# Ports:
+#   40500 - Health/status (internal only)
+#   40501 - History API (FastAPI)
+#   40502 - Forecast API
+#   40503 - Panic API
+#   40510 - Airflow webserver (internal only)
+#
+# __PREFIX__ is replaced at deploy time:
+#   prod → /bike-parking
+#   qa   → /bike-parking/beta
+
+
+# ─── Public endpoints ───────────────────────────────────────────
+
+# History API (current availability + history)
+location __PREFIX__/history/ {
+    proxy_pass http://127.0.0.1:40501/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix __PREFIX__/history;
+
+    proxy_hide_header 'Access-Control-Allow-Origin';
+
+    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+
+    if ($request_method = 'OPTIONS') {
+        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+        return 204;
+    }
+}
+
+# Forecast API
+location __PREFIX__/forecast/ {
+    proxy_pass http://127.0.0.1:40502/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix __PREFIX__/forecast;
+
+    proxy_hide_header 'Access-Control-Allow-Origin';
+
+    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+
+    if ($request_method = 'OPTIONS') {
+        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+        return 204;
+    }
+}
+
+# Panic API
+location __PREFIX__/panic/ {
+    proxy_pass http://127.0.0.1:40503/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix __PREFIX__/panic;
+
+    proxy_hide_header 'Access-Control-Allow-Origin';
+
+    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+
+    if ($request_method = 'OPTIONS') {
+        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+        return 204;
+    }
+}
+
+
+# ─── Internal-only endpoints (restrict to localhost / VPN) ───────
+
+# Health check (internal)
+location __PREFIX__/health/ {
+    # Restrict access: only local and private networks
+    allow 127.0.0.1;
+    allow ::1;
+    allow 192.168.0.0/16;
+    allow 10.0.0.0/8;
+    deny all;
+
+    proxy_pass http://127.0.0.1:40500/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+# Airflow webserver (internal)
+location __PREFIX__/airflow/ {
+    # Restrict access: only local and private networks
+    allow 127.0.0.1;
+    allow ::1;
+    allow 192.168.0.0/16;
+    allow 10.0.0.0/8;
+    deny all;
+
+    proxy_pass http://127.0.0.1:40510/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix __PREFIX__/airflow;
+
+    # Airflow UI uses WebSocket for log tailing
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_read_timeout 86400;
+}
