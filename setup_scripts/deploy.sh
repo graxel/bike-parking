@@ -31,7 +31,7 @@ cat settings.env secrets.env > .env
 NGINX_APPS_DIR="/etc/nginx/sites-available/apps"
 NGINX_CONF="bike-parking"
 
-nginx -v || sudo apt install nginx -y
+sudo nginx -v || sudo apt install nginx -y
 sudo mkdir -p "${NGINX_APPS_DIR}"
 echo "==> Installing nginx config (prefix: ${PREFIX})"
 sed "s|__PREFIX__|${PREFIX}|g" nginx/bike-parking \
