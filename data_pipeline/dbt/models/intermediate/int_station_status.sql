@@ -22,7 +22,7 @@ WITH new_data AS (
     {% if is_incremental() %}
         -- This ensures we only look at rows ingested since the last dbt run
         -- instead of scanning the entire staging history
-        WHERE s.ingested_at > (SELECT MAX(ingested_at) FROM {{ this }})
+        WHERE s.ingested_at > (SELECT COALESCE(MAX(ingested_at), '1900-01-01'::timestamp) FROM {{ this }})
     {% endif %}
 )
 
