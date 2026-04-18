@@ -1,10 +1,44 @@
+/*
+ * API Configuration
+ * 
+ * The frontend is served from kevingrazel.com (GitHub Pages).
+ * The APIs live on data.kevingrazel.com (RPi servers behind router).
+ *
+ * Prod:  https://data.kevingrazel.com/bike-parking
+ * Beta:  https://data.kevingrazel.com:4443/bike-parking/beta
+ *
+ * To switch environments, change API_BASE below or set it via query param:
+ *   ?api=beta  → use beta API
+ *   ?api=prod  → use prod API (default)
+ */
+const API_CONFIGS = {
+    prod: "https://data.kevingrazel.com/bike-parking",
+    qa:   "https://data.kevingrazel.com:4443/bike-parking/beta",
+    // Always uses the current hostname (Mac IP or localhost) for local testing
+    dev:  `${window.location.origin}/bike-parking`,
+};
+
+function getApiBase() {
+    const params = new URLSearchParams(window.location.search);
+    const env = params.get("api");
+    if (env) return API_CONFIGS[env] || API_CONFIGS.prod;
+
+    // Default to local for localhost, prod for remote
+    if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+        return API_CONFIGS.dev;
+    }
+    return API_CONFIGS.prod;
+}
+
+const API_BASE = getApiBase();
+
 document.addEventListener("DOMContentLoaded", async () => {
     const dashboard = document.getElementById("dashboard");
 
     try {
         const [currentRes, historyRes] = await Promise.all([
-            fetch("/api/availability/current"),
-            fetch("/api/availability/history")
+            fetch(`${API_BASE}/current/`),
+            fetch(`${API_BASE}/history/`)
         ]);
 
         const currentData = await currentRes.json();
@@ -152,7 +186,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
         return `${day} ${time}`;
     });
 
-    // High–low “bricks” plus average line
+    // High–low "bricks" plus average line
     const highLowBars = historyData.map((d, index) => ({
         x: labels[index],
         y: [d.min_docks_available || 0, d.max_docks_available || 0]
@@ -298,7 +332,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
     };
 
     new Chart(ctx, {
-        type: "bar", // “Flying bricks” as vertical bars
+        type: "bar", // "Flying bricks" as vertical bars
         plugins: [midnightDividerPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
         data: {
             labels: labels,

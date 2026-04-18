@@ -1,20 +1,44 @@
 #!/usr/bin/env bash
 # setup_scripts/deploy.sh
-# Called remotely by GitHub Actions after git pull.
-# Env vars are injected by appleboy/ssh-action via the 'envs' field.
+# Universal deployment script for Local (Mac), QA (RPi), and Prod (RPi).
 set -euo pipefail
 
-# --- Determine environment from branch --------------------------
-case "${GITHUB_REF_NAME}" in
-  main) PREFIX="/bike-parking"      ;;
-  test) PREFIX="/bike-parking/beta" ;;
-  *)    echo "Unknown branch: ${GITHUB_REF_NAME}" >&2; exit 1 ;;
-esac
-echo "==> Environment: ${GITHUB_REF_NAME} (prefix: ${PREFIX})"
+# --- 1. Detect environment ---
+OS_TYPE=$(uname -s)
+if [ -n "${GITHUB_REF_NAME:-}" ]; then
+    BRANCH="${GITHUB_REF_NAME}"
+else
+    BRANCH="local"
+fi
 
-# --- Write secrets.env ------------------------------------------
-echo "==> Writing secrets.env"
-cat > secrets.env <<EOF
+case "${BRANCH}" in
+  main)  ENV="prod"  ; PREFIX="/bike-parking"      ;;
+  test)  ENV="qa"    ; PREFIX="/bike-parking/beta" ;;
+  local) ENV="local" ; PREFIX="/bike-parking"      ;;
+  *)     echo "Unknown branch: ${BRANCH}" >&2; exit 1 ;;
+esac
+
+echo "==> Deploying to Environment: ${ENV} (OS: ${OS_TYPE}, Prefix: ${PREFIX})"
+
+# --- 2. environment-specific variables ---
+if [ "${OS_TYPE}" == "Darwin" ]; then
+    # Mac (Homebrew) paths
+    NGINX_APPS_DIR="/opt/homebrew/etc/nginx/sites-available/apps"
+    RELOAD_CMD="brew services restart nginx"
+    SUDO=""
+    # Add Docker Desktop to path for local dev
+    export PATH="/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
+else
+    # Linux (Debian/RPi) paths
+    NGINX_APPS_DIR="/etc/nginx/sites-available/apps"
+    RELOAD_CMD="sudo systemctl reload nginx"
+    SUDO="sudo"
+fi
+
+# --- 3. Handle Secrets ---
+if [ "${ENV}" != "local" ]; then
+    echo "==> Writing secrets.env from injected variables"
+    cat > secrets.env <<EOF
 DB_NAME=${DB_NAME}
 DB_HOST=${DB_HOST}
 DB_PORT=${DB_PORT}
@@ -22,32 +46,55 @@ DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
 AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW__WEBSERVER__SECRET_KEY}
 EOF
+else
+    if [ ! -f secrets.env ]; then
+        echo "ERROR: secrets.env not found. Please create it first for local dev!" >&2
+        exit 1
+    fi
+fi
 
-# --- Build .env for Docker Compose ------------------------------
-echo "==> Refreshing .env for Docker Compose"
+# --- 4. Build .env for Docker Compose ---
+echo "==> Refreshing .env"
 cat settings.env secrets.env > .env
 
-# --- Set up nginx -----------------------------------------------
-NGINX_APPS_DIR="/etc/nginx/sites-available/apps"
-NGINX_CONF="bike-parking"
+# --- 5. Configure Nginx ---
+$SUDO mkdir -p "${NGINX_APPS_DIR}"
 
-sudo nginx -v || sudo apt install nginx -y
-sudo mkdir -p "${NGINX_APPS_DIR}"
-echo "==> Installing nginx config (prefix: ${PREFIX})"
-sed "s|__PREFIX__|${PREFIX}|g" nginx/bike-parking \
-    | sudo tee "${NGINX_APPS_DIR}/${NGINX_CONF}" > /dev/null
+echo "==> Generating nginx config from template"
+# Substitute prefix
+CONFIG_CONTENT=$(sed "s|__PREFIX__|${PREFIX}|g" nginx/bike-parking)
 
-echo "==> Testing nginx config"
-sudo nginx -t
+# Add local-only overrides
+if [ "${ENV}" == "local" ]; then
+    # Relax CORS for local dev and append local frontend locations
+    CONFIG_CONTENT=$(echo "${CONFIG_CONTENT}" | sed "s|'https://kevingrazel.com'|'*'|g")
+    
+    CONFIG_CONTENT="${CONFIG_CONTENT}
 
-echo "==> Reloading nginx"
-sudo systemctl reload nginx
+# --- Frontend (Local Development) ---
+location /bike-parking/ {
+    alias $(pwd)/app/frontend/;
+    index index.html;
+}"
+fi
 
-# --- Build and start containers ---------------------------------
-echo "==> Building and starting containers"
+echo "${CONFIG_CONTENT}" | $SUDO tee "${NGINX_APPS_DIR}/bike-parking" > /dev/null
+
+echo "==> Testing and reloading nginx"
+$SUDO nginx -t
+$RELOAD_CMD
+
+# --- 6. Orchestrate Containers ---
+echo "==> Starting containers"
+# Note: $RUN_CMD is built to handle the Mac terminal issue if needed
 docker compose up --build -d
 
-echo "==> Running airflow-init"
-docker compose run --rm airflow-init
+if [ "${ENV}" != "local" ]; then
+    echo "==> Running remote-only tasks (airflow-init)"
+    docker compose run --rm airflow-init
+fi
 
-echo "==> *** Deploy complete! ***"
+echo "==> *** Deployment complete for ${ENV}! ***"
+if [ "${ENV}" == "local" ]; then
+    echo "Local Preview: http://localhost:8080/bike-parking/"
+fi

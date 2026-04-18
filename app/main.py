@@ -3,8 +3,7 @@ import yaml
 import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
@@ -40,11 +39,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Citi Bike Parking Tracker", lifespan=lifespan)
 
-@app.get("/api/groups")
+# CORS is handled by nginx in production, but allow it here for local dev
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://kevingrazel.com", "http://localhost:3000"],
+    allow_methods=["GET", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
+
+@app.get("/groups")
 def get_groups():
     return {"groups": app.state.groups}
 
-@app.get("/api/availability/current")
+@app.get("/current")
+@app.get("/")
 def get_current_availability():
     conn = get_db_connection()
     try:
@@ -76,7 +84,7 @@ def get_current_availability():
     finally:
         conn.close()
 
-@app.get("/api/availability/history")
+@app.get("/history")
 def get_history_availability():
     conn = get_db_connection()
     try:
@@ -122,8 +130,3 @@ def get_history_availability():
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
-
-# Mount frontend
-frontend_dir = os.path.join(os.path.dirname(__file__), "frontend")
-os.makedirs(frontend_dir, exist_ok=True)
-app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")

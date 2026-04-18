@@ -34,9 +34,30 @@ location __PREFIX__/history/ {
     }
 }
 
+# Current API
+location __PREFIX__/current/ {
+    proxy_pass http://127.0.0.1:40502/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Prefix __PREFIX__/current;
+
+    proxy_hide_header 'Access-Control-Allow-Origin';
+
+    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+
+    if ($request_method = 'OPTIONS') {
+        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
+        return 204;
+    }
+}
+
 # Forecast API
 location __PREFIX__/forecast/ {
-    proxy_pass http://127.0.0.1:40502/;
+    proxy_pass http://127.0.0.1:40503/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -57,7 +78,7 @@ location __PREFIX__/forecast/ {
 
 # Panic API
 location __PREFIX__/panic/ {
-    proxy_pass http://127.0.0.1:40503/;
+    proxy_pass http://127.0.0.1:40504/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

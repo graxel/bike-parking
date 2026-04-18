@@ -1,10 +1,18 @@
 services:
 
-  app:
+  current:
     build: .
+    env_file: .env
     ports:
-      - "${APP_PORT}:${APP_PORT}"
-    command: ["fastapi", "run", "app/main.py", "--port", "${APP_PORT}", "--host", "0.0.0.0"]
+      - "${CURRENT_PORT}:${CURRENT_PORT}"
+    command: ["fastapi", "run", "app/current.py", "--port", "${CURRENT_PORT}", "--host", "0.0.0.0"]
+
+  history:
+    build: .
+    env_file: .env
+    ports:
+      - "${HISTORY_PORT}:${HISTORY_PORT}"
+    command: ["fastapi", "run", "app/history.py", "--port", "${HISTORY_PORT}", "--host", "0.0.0.0"]
 
   airflow-init:
     build: .
