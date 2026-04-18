@@ -24,6 +24,7 @@ echo "==> Deploying to Environment: ${ENV} (OS: ${OS_TYPE})"
 if [ "${OS_TYPE}" == "Darwin" ]; then
     # Mac (Homebrew) paths
     NGINX_APPS_DIR="/opt/homebrew/etc/nginx/sites-available/apps"
+    NGINX_ENABLED_APPS_DIR="/opt/homebrew/etc/nginx/sites-enabled/apps"
     RELOAD_CMD="brew services restart nginx"
     SUDO=""
     # Add Docker Desktop to path for local dev
@@ -31,6 +32,7 @@ if [ "${OS_TYPE}" == "Darwin" ]; then
 else
     # Linux (Debian/RPi) paths
     NGINX_APPS_DIR="/etc/nginx/sites-available/apps"
+    NGINX_ENABLED_APPS_DIR="/etc/nginx/sites-enabled/apps"
     RELOAD_CMD="sudo systemctl reload nginx"
     SUDO="sudo"
 fi
@@ -59,6 +61,7 @@ cat settings.env secrets.env > .env
 
 # --- 5. Configure Nginx ---
 $SUDO mkdir -p "${NGINX_APPS_DIR}"
+$SUDO mkdir -p "${NGINX_ENABLED_APPS_DIR}"
 
 echo "==> Generating nginx config"
 CONFIG_CONTENT=$(cat nginx/bike-parking)
@@ -78,6 +81,9 @@ location /bike-parking/ {
 fi
 
 echo "${CONFIG_CONTENT}" | $SUDO tee "${NGINX_APPS_DIR}/bike-parking" > /dev/null
+
+echo "==> Enabling nginx config (symlink)"
+$SUDO ln -sf "${NGINX_APPS_DIR}/bike-parking" "${NGINX_ENABLED_APPS_DIR}/bike-parking"
 
 echo "==> Testing and reloading nginx"
 $SUDO nginx -t
