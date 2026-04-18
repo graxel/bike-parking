@@ -12,13 +12,13 @@ else
 fi
 
 case "${BRANCH}" in
-  main)  ENV="prod"  ; PREFIX="/bike-parking"      ;;
-  test)  ENV="qa"    ; PREFIX="/bike-parking/beta" ;;
-  local) ENV="local" ; PREFIX="/bike-parking"      ;;
+  main)  ENV="prod"  ;;
+  test)  ENV="qa"    ;;
+  local) ENV="local" ;;
   *)     echo "Unknown branch: ${BRANCH}" >&2; exit 1 ;;
 esac
 
-echo "==> Deploying to Environment: ${ENV} (OS: ${OS_TYPE}, Prefix: ${PREFIX})"
+echo "==> Deploying to Environment: ${ENV} (OS: ${OS_TYPE})"
 
 # --- 2. environment-specific variables ---
 if [ "${OS_TYPE}" == "Darwin" ]; then
@@ -60,9 +60,8 @@ cat settings.env secrets.env > .env
 # --- 5. Configure Nginx ---
 $SUDO mkdir -p "${NGINX_APPS_DIR}"
 
-echo "==> Generating nginx config from template"
-# Substitute prefix
-CONFIG_CONTENT=$(sed "s|__PREFIX__|${PREFIX}|g" nginx/bike-parking)
+echo "==> Generating nginx config"
+CONFIG_CONTENT=$(cat nginx/bike-parking)
 
 # Add local-only overrides
 if [ "${ENV}" == "local" ]; then
