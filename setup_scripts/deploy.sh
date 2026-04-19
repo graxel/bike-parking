@@ -96,11 +96,6 @@ docker compose down --remove-orphans
 echo "==> Starting containers"
 docker compose up --build -d --remove-orphans
 
-if [ "${ENV}" != "local" ]; then
-    echo "==> Running remote-only tasks (airflow-init)"
-    docker compose run --rm airflow-init
-fi
-
 echo "==> *** Deployment complete for ${ENV}! ***"
 if [ "${ENV}" == "local" ]; then
     echo "Local Preview: http://localhost:8080/bike-parking/"
