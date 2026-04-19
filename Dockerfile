@@ -2,7 +2,9 @@ FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/bike-parking
+    PYTHONPATH=/bike-parking \
+    AIRFLOW_HOME=/bike-parking/airflow \
+    AIRFLOW__CORE__DAGS_FOLDER=/bike-parking/data_pipeline/dags
 
 # Set working directory inside the container
 WORKDIR /bike-parking
