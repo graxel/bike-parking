@@ -9,6 +9,10 @@ WORKDIR /bike-parking
 
 # # Install uv
 # COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 # Install uv using the standalone installer script
 ADD https://astral.sh/uv/install.sh /install.sh
 RUN chmod +x /install.sh && /install.sh && rm /install.sh
