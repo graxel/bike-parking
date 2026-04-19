@@ -5,6 +5,9 @@ services:
     env_file: .env
     ports:
       - "${CURRENT_PORT}:${CURRENT_PORT}"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
     command: ["fastapi", "run", "app/current.py", "--port", "${CURRENT_PORT}", "--host", "0.0.0.0"]
 
   history:
@@ -12,6 +15,9 @@ services:
     env_file: .env
     ports:
       - "${HISTORY_PORT}:${HISTORY_PORT}"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
     command: ["fastapi", "run", "app/history.py", "--port", "${HISTORY_PORT}", "--host", "0.0.0.0"]
 
   airflow-init:
