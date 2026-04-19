@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv using the standalone installer script
 ADD https://astral.sh/uv/install.sh /install.sh
 RUN chmod +x /install.sh && /install.sh && rm /install.sh
-ENV PATH="/root/.cargo/bin/:$PATH"
+ENV PATH="/root/.local/bin/:$PATH"
 
 # Copy dependency files FIRST
 # Docker Trick: if dependencies don't change, 
