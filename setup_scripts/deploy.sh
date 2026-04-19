@@ -90,9 +90,11 @@ $SUDO nginx -t
 $RELOAD_CMD
 
 # --- 6. Orchestrate Containers ---
+echo "==> Shutting down existing containers to free ports"
+docker compose down --remove-orphans
+
 echo "==> Starting containers"
-# Note: $RUN_CMD is built to handle the Mac terminal issue if needed
-docker compose up --build -d
+docker compose up --build -d --remove-orphans
 
 if [ "${ENV}" != "local" ]; then
     echo "==> Running remote-only tasks (airflow-init)"
