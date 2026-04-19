@@ -4,7 +4,7 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/bike-parking \
     AIRFLOW_HOME=/bike-parking/airflow \
-    AIRFLOW__CORE__DAGS_FOLDER=/bike-pipeline/data_pipeline/dags \
+    AIRFLOW__CORE__DAGS_FOLDER=/bike-parking/data_pipeline/dags \
     PATH="/root/.local/bin/:/bike-parking/.venv/bin:$PATH"
 
 # 2. Heavy Lifting (Cached unless base image changes)
