@@ -13,7 +13,7 @@
  */
 const API_CONFIGS = {
     prod: "https://data.kevingrazel.com/bike-parking",
-    qa:   "https://data.kevingrazel.com:4443/bike-parking/beta",
+    qa:   "https://data.kevingrazel.com:4443/bike-parking",
     // Always uses the current hostname (Mac IP or localhost) for local testing
     dev:  `${window.location.origin}/bike-parking`,
 };

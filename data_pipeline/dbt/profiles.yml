@@ -9,7 +9,7 @@ citibike_dbt:
       port: "{{ env_var('DB_PORT') | as_number }}"
       dbname: "{{ env_var('DB_NAME') }}"
       schema: public
-      threads: 4
+      threads: 1
       connect_timeout: 5
       
     qa:
@@ -20,7 +20,7 @@ citibike_dbt:
       port: "{{ env_var('DB_PORT') | as_number }}"
       dbname: "{{ env_var('DB_NAME') }}"
       schema: public
-      threads: 4
+      threads: 1
       connect_timeout: 5
       
     prod:
@@ -31,5 +31,5 @@ citibike_dbt:
       port: "{{ env_var('DB_PORT') | as_number }}"
       dbname: "{{ env_var('DB_NAME') }}"
       schema: public
-      threads: 4
+      threads: 1
       connect_timeout: 5

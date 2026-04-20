@@ -6,7 +6,7 @@
 #   40503 - Panic API
 #   40510 - Airflow webserver (internal only)
 #
-# __PREFIX__ is replaced at deploy time:
+# /bike-parking is replaced at deploy time:
 #   prod → /bike-parking
 #   qa   → /bike-parking/beta
 
@@ -14,13 +14,13 @@
 # --- Public endpoints -------------------------------------------
 
 # History API (current availability + history)
-location __PREFIX__/history/ {
+location /bike-parking/history/ {
     proxy_pass http://127.0.0.1:40501/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix __PREFIX__/history;
+    proxy_set_header X-Forwarded-Prefix /bike-parking/history;
 
     proxy_hide_header 'Access-Control-Allow-Origin';
 
@@ -35,13 +35,13 @@ location __PREFIX__/history/ {
 }
 
 # Current API
-location __PREFIX__/current/ {
+location /bike-parking/current/ {
     proxy_pass http://127.0.0.1:40502/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix __PREFIX__/current;
+    proxy_set_header X-Forwarded-Prefix /bike-parking/current;
 
     proxy_hide_header 'Access-Control-Allow-Origin';
 
@@ -56,13 +56,13 @@ location __PREFIX__/current/ {
 }
 
 # Forecast API
-location __PREFIX__/forecast/ {
+location /bike-parking/forecast/ {
     proxy_pass http://127.0.0.1:40503/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix __PREFIX__/forecast;
+    proxy_set_header X-Forwarded-Prefix /bike-parking/forecast;
 
     proxy_hide_header 'Access-Control-Allow-Origin';
 
@@ -77,13 +77,13 @@ location __PREFIX__/forecast/ {
 }
 
 # Panic API
-location __PREFIX__/panic/ {
+location /bike-parking/panic/ {
     proxy_pass http://127.0.0.1:40504/;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix __PREFIX__/panic;
+    proxy_set_header X-Forwarded-Prefix /bike-parking/panic;
 
     proxy_hide_header 'Access-Control-Allow-Origin';
 
@@ -101,7 +101,7 @@ location __PREFIX__/panic/ {
 # --- Internal-only endpoints (restrict to localhost / VPN) -------
 
 # Health check (internal)
-location __PREFIX__/health/ {
+location /bike-parking/health/ {
     # Restrict access: only local and private networks
     allow 127.0.0.1;
     allow ::1;
@@ -117,7 +117,7 @@ location __PREFIX__/health/ {
 }
 
 # Airflow webserver (internal)
-location __PREFIX__/airflow/ {
+location /bike-parking/airflow/ {
     # Restrict access: only local and private networks
     allow 127.0.0.1;
     allow ::1;
@@ -130,7 +130,7 @@ location __PREFIX__/airflow/ {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix __PREFIX__/airflow;
+    proxy_set_header X-Forwarded-Prefix /bike-parking/airflow;
 
     # Airflow UI uses WebSocket for log tailing
     proxy_http_version 1.1;
