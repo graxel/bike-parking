@@ -16,5 +16,6 @@ groups:
 
   - name: Gym
     stations:
-      - "66de4078-0aca-11e7-82f6-3863bb44ef7c"
+      - "bca594e5-779f-4866-bd6b-818871f97d38"
+      - "66de0d91-0aca-11e7-82f6-3863bb44ef7c"
 
