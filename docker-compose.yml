@@ -26,9 +26,9 @@ services:
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
       - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=1
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=0
-      - AIRFLOW__WEBSERVER__WORKERS=1
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=5
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=5
+      - AIRFLOW__WEBSERVER__WORKERS=2
     volumes:
       - ./airflow/logs:/bike-parking/airflow/logs
     command: 
@@ -55,9 +55,9 @@ services:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
       - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
       - AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=1
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=0
-      - AIRFLOW__WEBSERVER__WORKERS=1
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=5
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=5
+      - AIRFLOW__WEBSERVER__WORKERS=2
     volumes:
       - ./airflow/logs:/bike-parking/airflow/logs
     # Wait for the database schema to be ready
@@ -73,8 +73,8 @@ services:
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
       - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=1
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=0
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=5
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=5
     volumes:
       - ./airflow/logs:/bike-parking/airflow/logs
     # Wait for the database schema to be ready
