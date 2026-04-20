@@ -24,4 +24,4 @@ RUN uv sync --frozen --no-install-project
 COPY . .
 
 # Default command
-CMD ["fastapi", "run", "app/current.py", "--port", "40502", "--host", "0.0.0.0"]
+CMD ["fastapi", "run", "app/main.py", "--port", "40501", "--host", "0.0.0.0"]

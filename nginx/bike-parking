@@ -15,7 +15,7 @@
 
 # History API (current availability + history)
 location /bike-parking/history/ {
-    proxy_pass http://127.0.0.1:40501/;
+    proxy_pass http://127.0.0.1:40501/history;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -36,7 +36,7 @@ location /bike-parking/history/ {
 
 # Current API
 location /bike-parking/current/ {
-    proxy_pass http://127.0.0.1:40502/;
+    proxy_pass http://127.0.0.1:40501/current;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

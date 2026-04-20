@@ -1,15 +1,15 @@
 /*
  * API Configuration
  * 
- * The frontend is served from kevingrazel.com (GitHub Pages).
- * The APIs live on data.kevingrazel.com (RPi servers behind router).
+ * The frontend and APIs live on data.kevingrazel.com (Local/RPi infrastructure).
+ * 
+ * All requests are routed through a consolidated Nginx gateway:
+ *   /bike-parking/current/ -> Consolidated API (port 40501)
+ *   /bike-parking/history/ -> Consolidated API (port 40501)
  *
- * Prod:  https://data.kevingrazel.com/bike-parking
- * Beta:  https://data.kevingrazel.com:4443/bike-parking/beta
- *
- * To switch environments, change API_BASE below or set it via query param:
- *   ?api=beta  → use beta API
- *   ?api=prod  → use prod API (default)
+ * Environment endpoints:
+ *   Prod (Main): https://data.kevingrazel.com/bike-parking
+ *   QA (Test):   https://data.kevingrazel.com:4443/bike-parking
  */
 const API_CONFIGS = {
     prod: "https://data.kevingrazel.com/bike-parking",
@@ -71,15 +71,24 @@ function renderDashboard(currentGroups, historyGroups, container) {
         // Aggregate Current Stats
         let totalBikes = 0;
         let totalDocks = 0;
+        let totalCapacity = 0;
         let stationsHtml = '<div class="station-list" style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-secondary); border-top: 1px solid var(--surface-border); padding-top: 1rem;">';
 
         group.stations.forEach(station => {
             totalBikes += (station.num_bikes_available || 0);
             totalDocks += (station.num_docks_available || 0);
+            totalCapacity += (station.capacity || 0);
+            const stationSpanId = `station-${station.station_id}-val-${group.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            
+            const safeDocks = Math.round(station.num_docks_available || 0);
+            const paddedDocks = (safeDocks >= 0 && safeDocks < 10) ? `<span style="visibility: hidden;">0</span>${safeDocks}` : `${safeDocks}`;
+            
             stationsHtml += `
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem; align-items:center;">
-                    <span style="color: var(--text-primary);">${station.station_name || 'Station ' + station.station_id}</span>
-                    <span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">${station.num_docks_available || 0} docks</span>
+                    <span style="color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 50%;">${station.station_name || 'Station ' + station.station_id}</span>
+                    <span id="${stationSpanId}" style="text-align: right; min-width: 150px; font-variant-numeric: tabular-nums;">
+                        <span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">docks: ${paddedDocks}</span>
+                    </span>
                 </div>
             `;
         });
@@ -115,31 +124,37 @@ function renderDashboard(currentGroups, historyGroups, container) {
 
         const canvasId = `chart-group-${group.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
         const hudId = `hud-${canvasId}`;
+        const groupSlug = group.name.replace(/[^a-zA-Z0-9]/g, '-');
+        const dateAreaId = `date-area-${groupSlug}`;
 
-        const now = new Date();
-        const nowDay = now.toLocaleDateString([], { weekday: 'short' });
-        const nowTime = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+        const padToTwo = (num) => {
+            const val = Math.round(num);
+            return (val >= 0 && val < 10) ? `<span style="visibility: hidden;">0</span>${val}` : `${val}`;
+        };
 
         const defaultHudText = `
-            <div style="display: grid; grid-template-columns: 125px 1px 65px 1px 70px 1px 65px; column-gap: 12px; align-items: center; text-align: left;">
-                <span style="color:#f8fafc;">${nowDay} ${nowTime}</span>
-                <div style="width:1px; height:12px; background:rgba(255,255,255,0.15);"></div>
-                <span style="grid-column: 3 / span 5;"><b>${Math.round(totalDocks)} docks available</b></span>
+            <div style="display: grid; grid-template-columns: auto auto; gap: 0.15rem 0.5rem; align-items: center; justify-content: end;">
+                <div style="font-size: 0.95rem;">&nbsp;</div>
+                <div style="font-size: 0.95rem;">&nbsp;</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Docks:</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${padToTwo(totalDocks)}</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Bikes:</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${padToTwo(totalBikes)}</div>
             </div>
         `;
 
         card.innerHTML = `
-            <div class="group-header" style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: none; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <h2 class="group-title">${group.name}</h2>
-                    <div class="station-metrics">
-                        <span class="metric docks" style="font-size: 1.15rem;">🅿️ ${Math.round(totalDocks)} Docks</span>
-                        <span class="metric bikes" style="font-size: 1.0rem; opacity: 0.7;">🚲 ${Math.round(totalBikes)} Bikes</span>
+            <div class="group-header" style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: none; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: nowrap; gap: 10px;">
+                <div style="display: flex; flex-direction: column;">
+                    <h2 class="group-title" style="margin-bottom: 0.25rem;">${group.name}</h2>
+                    <div id="${dateAreaId}" style="visibility: hidden; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.3;">
+                        <div style="margin-top: 0.2rem;">Day</div>
+                        <div>Time</div>
                     </div>
                 </div>
-                <div id="${hudId}" style="color: #94a3b8; font-family: 'Inter', sans-serif; font-size: 0.85rem; padding: 0.5rem 0.8rem; background: rgba(15, 23, 42, 0.4); border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">${defaultHudText}</div>
+                <div id="${hudId}" style="display: flex; align-items: flex-start; justify-content: flex-end;">${defaultHudText}</div>
             </div>
-            <div class="chart-container" style="height: 220px; margin-bottom: 1rem;">
+            <div class="chart-container" style="height: 265px; margin-bottom: 1rem;">
                 <canvas id="${canvasId}"></canvas>
             </div>
             ${stationsHtml}
@@ -148,18 +163,28 @@ function renderDashboard(currentGroups, historyGroups, container) {
         container.appendChild(card);
 
         if (aggregatedHistory.length > 0) {
-            renderChart(canvasId, hudId, defaultHudText, aggregatedHistory);
+            renderChart(canvasId, hudId, defaultHudText, aggregatedHistory, totalCapacity, totalDocks, totalBikes, group.stations, hGroup ? hGroup.stations : {}, groupSlug);
         }
     });
 }
 
-function renderChart(canvasId, hudId, defaultHudText, historyData) {
+function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity, totalDocks, totalBikes, groupStations, historyStations, groupSlug) {
     const el = document.getElementById(canvasId);
     if (!el) return;
     const ctx = el.getContext("2d");
 
+    const now = new Date();
+
     // Sort chronologically
     historyData.sort((a, b) => new Date(a.reported_hour) - new Date(b.reported_hour));
+
+    // Calculate expected interval dynamically without any magic multipliers.
+    // Since SQL uses DATE_TRUNC, consecutive buckets will have exactly 'minInterval' diff.
+    let minInterval = Infinity;
+    for (let i = 1; i < historyData.length; i++) {
+        const diff = new Date(historyData[i].reported_hour) - new Date(historyData[i - 1].reported_hour);
+        if (diff > 0 && diff < minInterval) minInterval = diff;
+    }
 
     // Calculate the dynamic daily midpoint index to consistently center the x-axis text label
     const dayIndexGroups = {};
@@ -178,17 +203,13 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
         midpointIndices.add(mid);
     });
 
-    // X Axis Labels
-    const labels = historyData.map(d => {
-        const date = new Date(d.reported_hour);
-        const day = date.toLocaleDateString([], { weekday: 'short' });
-        const time = date.toLocaleTimeString([], { hour: 'numeric' });
-        return `${day} ${time}`;
-    });
+    const chartMin = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    const chartMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() < 12 ? 0 : 1), 23, 59, 59, 999);
 
     // High–low "bricks" plus average line
-    const highLowBars = historyData.map((d, index) => ({
-        x: labels[index],
+    // Map to {x, y} format where x is a Date or ISO string for the time axis
+    const highLowBars = historyData.map((d) => ({
+        x: d.reported_hour,
         y: [d.min_docks_available || 0, d.max_docks_available || 0]
     }));
 
@@ -198,30 +219,27 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
             const ctx = chart.ctx;
             const xAxis = chart.scales.x;
             const yAxis = chart.scales.y;
-            historyData.forEach((d, index) => {
-                const date = new Date(d.reported_hour);
-                if (date.getHours() === 0) {
-                    // Shift x offset to the boundary edge of the category (true midnight gridline location)
-                    let x;
-                    if (index > 0) {
-                        x = (xAxis.getPixelForTick(index) + xAxis.getPixelForTick(index - 1)) / 2;
-                    } else if (historyData.length > 1) {
-                        const step = xAxis.getPixelForTick(1) - xAxis.getPixelForTick(0);
-                        x = xAxis.getPixelForTick(0) - step / 2;
-                    } else {
-                        x = xAxis.getPixelForTick(0);
-                    }
+            
+            ctx.save();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.lineWidth = 1;
 
-                    ctx.save();
+            let currentDay = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate());
+            currentDay.setDate(currentDay.getDate() + 1); // Start dividing the next day boundaries
+
+            while (currentDay <= chartMax) {
+                const x = xAxis.getPixelForValue(currentDay.getTime());
+                
+                // Only draw if within chart area visually
+                if (x >= xAxis.left && x <= xAxis.right) {
                     ctx.beginPath();
                     ctx.moveTo(x, yAxis.bottom);
                     ctx.lineTo(x, yAxis.bottom + 22);
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-                    ctx.lineWidth = 1;
                     ctx.stroke();
-                    ctx.restore();
                 }
-            });
+                currentDay.setDate(currentDay.getDate() + 1);
+            }
+            ctx.restore();
         }
     };
 
@@ -250,14 +268,21 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
                     const left = element.x - (element.width / 2);
                     const right = element.x + (element.width / 2);
 
+                    // Gap detection: If the time between points is strictly greater than our expected bucket interval...
+                    if (index > 0) {
+                        const prevDate = new Date(historyData[index - 1].reported_hour);
+                        const currDate = new Date(d.reported_hour);
+                        if (currDate - prevDate > minInterval) {
+                            isFirst = true; // Break the average line to avoid bridging missing data
+                        }
+                    }
+
                     if (isFirst) {
                         ctx.moveTo(left, y);
                         isFirst = false;
                     } else {
-                        // Connect previous block's right edge vertically down/up to current block's height
                         ctx.lineTo(left, y);
                     }
-                    // Trace horizontal line covering current block
                     ctx.lineTo(right, y);
                 }
             });
@@ -271,6 +296,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
         id: 'xAxisLabels',
         afterDraw: (chart) => {
             const ctx = chart.ctx;
+            const xAxis = chart.scales.x;
             const yAxis = chart.scales.y;
             const meta = chart.getDatasetMeta(0);
 
@@ -282,25 +308,29 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
 
-            Object.values(dayIndexGroups).forEach(indices => {
-                const firstIdx = indices[0];
-                const lastIdx = indices[indices.length - 1];
+            // Loop through each day from chartMin to chartMax
+            let currentDay = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate());
+            while (currentDay <= chartMax) {
+                const dayStart = Math.max(currentDay.getTime(), chartMin.getTime());
+                const nextDay = new Date(currentDay);
+                nextDay.setDate(currentDay.getDate() + 1);
+                
+                const dayEnd = Math.min(nextDay.getTime() - 1, chartMax.getTime());
 
-                const firstEl = meta.data[firstIdx];
-                const lastEl = meta.data[lastIdx];
+                // Find pixel positions
+                const xStart = xAxis.getPixelForValue(dayStart);
+                const xEnd = xAxis.getPixelForValue(dayEnd);
+                const centerPixel = (xStart + xEnd) / 2;
 
-                if (firstEl && lastEl && !firstEl.hidden && !lastEl.hidden) {
-                    const leftPixel = firstEl.x - (firstEl.width / 2);
-                    const rightPixel = lastEl.x + (lastEl.width / 2);
-                    const centerPixel = (leftPixel + rightPixel) / 2;
+                const dayStr = currentDay.toLocaleDateString([], { weekday: 'short' });
+                const dateStr = `${currentDay.getMonth() + 1}/${currentDay.getDate()}`;
 
-                    const date = new Date(historyData[firstIdx].reported_hour);
-                    const day = date.toLocaleDateString([], { weekday: 'short' });
-                    const text = `${day} ${date.getMonth() + 1}/${date.getDate()}`;
+                ctx.fillText(dayStr, centerPixel, yAxis.bottom + 10);
+                ctx.fillText(dateStr, centerPixel, yAxis.bottom + 24);
 
-                    ctx.fillText(text, centerPixel, yAxis.bottom + 16); // Follows the 16px user layout padding dynamically
-                }
-            });
+                // Advance to next day
+                currentDay = nextDay;
+            }
 
             ctx.restore();
         }
@@ -309,7 +339,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
     const hoverHighlightPlugin = {
         id: 'hoverHighlight',
         beforeDatasetsDraw: (chart) => {
-            if (typeof chart.getActiveElements !== 'function') return; // Lifecycle safety guarantee
+            if (typeof chart.getActiveElements !== 'function') return;
             const activeElements = chart.getActiveElements();
             if (activeElements.length > 0) {
                 const activePoint = activeElements[0];
@@ -320,7 +350,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
                 const element = meta.data[activePoint.index];
                 if (element) {
                     ctx.save();
-                    ctx.fillStyle = "rgba(255, 255, 255, 0.04)"; // Extremely subtle vertical timeline optical crosshair trace down timeline
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
                     const left = element.x - (element.width / 2);
                     const top = chart.chartArea.top;
                     const bottom = chart.chartArea.bottom;
@@ -335,19 +365,17 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
         type: "bar", // "Flying bricks" as vertical bars
         plugins: [midnightDividerPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
         data: {
-            labels: labels,
             datasets: [
                 {
                     label: "High–Low Range",
                     type: "bar",
                     data: highLowBars,
-                    borderColor: "transparent", // Box borders removed
-                    backgroundColor: "#1b4968", // Solid blended color completely bypasses floating-pixel alpha-overlap accumulation
-                    // hoverBackgroundColor dropped so the block tone remains neutral, deferring highlight entirely to the unified background column trace
+                    borderColor: "transparent",
+                    backgroundColor: "#1b4968",
                     borderWidth: 0,
                     borderSkipped: false,
-                    categoryPercentage: 1.0, // Touches interval grid bounds perfectly
-                    barPercentage: 1.0       // Computes layout width precisely without arbitrary overflow
+                    categoryPercentage: 1.0,
+                    barPercentage: 1.0
                 }
             ]
         },
@@ -365,88 +393,145 @@ function renderChart(canvasId, hudId, defaultHudText, historyData) {
                     external: function (context) {
                         const tooltipModel = context.tooltip;
                         const hudEl = document.getElementById(hudId);
+                        const dateAreaEl = document.getElementById(`date-area-${groupSlug}`);
+
                         if (!hudEl) return;
 
                         // If mouse leaves chart, restore the live 'Now' default stats
                         if (tooltipModel.opacity === 0) {
                             hudEl.innerHTML = defaultHudText;
+
+                            if (dateAreaEl) {
+                                dateAreaEl.style.visibility = "hidden";
+                            }
+
+                            // Restore individual stations
+                            groupStations.forEach(s => {
+                                const sId = `station-${s.station_id}-val-${groupSlug}`;
+                                const el = document.getElementById(sId);
+                                if (el) {
+                                    const safeDocks = Math.round(s.num_docks_available || 0);
+                                    const paddedDocks = (safeDocks >= 0 && safeDocks < 10) ? `<span style="visibility: hidden;">0</span>${safeDocks}` : `${safeDocks}`;
+                                    el.innerHTML = `<span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">docks: ${paddedDocks}</span>`;
+                                }
+                            });
                             return;
                         }
 
-                        // If hovering a block, inject the bounds dynamically into the HUD header DOM node
+                        // If hovering a block, inject the bounds dynamically into the metrics and HUD
                         if (tooltipModel.body) {
                             const dataIndex = tooltipModel.dataPoints[0].dataIndex;
                             const d = historyData[dataIndex];
+                            const hoverHour = d.reported_hour;
 
                             const start = new Date(d.reported_hour);
                             const end = new Date(start.getTime() + 60 * 60 * 1000);
-                            const day = start.toLocaleDateString([], { weekday: 'short' });
+                            const day = start.toLocaleDateString([], { weekday: 'long' });
                             const startStr = start.toLocaleTimeString([], { hour: 'numeric' }).toLowerCase();
                             const endStr = end.toLocaleTimeString([], { hour: 'numeric' }).toLowerCase();
 
                             const formatVal = (val) => {
                                 const num = parseFloat(val);
-                                return Number.isInteger(num) ? num.toString() : num.toFixed(1).replace(/\.0$/, '');
+                                let fixedStr = num.toFixed(1);
+
+                                if (num >= 0 && num < 10) {
+                                    fixedStr = `<span style="visibility: hidden;">0</span>${fixedStr}`;
+                                }
+                                
+                                if (fixedStr.endsWith('.0')) {
+                                    return `${fixedStr.slice(0, -2)}<span style="visibility: hidden;">.0</span>`;
+                                }
+                                return fixedStr;
                             };
 
                             const max = formatVal(d.max_docks_available || 0);
                             const avg = formatVal(d.avg_docks_available || 0);
                             const min = formatVal(d.min_docks_available || 0);
 
+                            // Set HUD to active min/avg/max
                             hudEl.innerHTML = `
-                                <div style="display: grid; grid-template-columns: 125px 1px 65px 1px 70px 1px 65px; column-gap: 12px; align-items: center; text-align: left;">
-                                    <span style="color:#f8fafc;">${day} ${startStr} - ${endStr}</span>
-                                    <div style="width:1px; height:12px; background:rgba(255,255,255,0.15);"></div>
-                                    <span>Max: <br><b style="color:#fff;">${max}</b></span>
-                                    <div style="width:1px; height:12px; background:rgba(255,255,255,0.15);"></div>
-                                    <span>Avg: <br><b style="color:#fff;">${avg}</b></span>
-                                    <div style="width:1px; height:12px; background:rgba(255,255,255,0.15);"></div>
-                                    <span>Min: <br><b style="color:#fff;">${min}</b></span>
+                                <div style="display: grid; grid-template-columns: auto auto; gap: 0.15rem 0.5rem; align-items: center; justify-content: end;">
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Max Docks:</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${max}</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Avg Docks:</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${avg}</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Min Docks:</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${min}</div>
                                 </div>
                             `;
+
+                            if (dateAreaEl) {
+                                dateAreaEl.innerHTML = `
+                                    <div style="margin-top: 0.2rem;">${day}</div>
+                                    <div>${startStr} - ${endStr}</div>
+                                `;
+                                dateAreaEl.style.visibility = "visible";
+                            }
+
+                            // Update individual stations with avg
+                            groupStations.forEach(s => {
+                                const sId = `station-${s.station_id}-val-${groupSlug}`;
+                                const el = document.getElementById(sId);
+                                if (el) {
+                                    const sHistory = historyStations[s.station_id] || [];
+                                    const hEntry = sHistory.find(h => h.reported_hour === hoverHour);
+                                    if (hEntry) {
+                                        const hAvg = formatVal(hEntry.avg_docks_available || 0);
+                                        el.innerHTML = `<span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">avg docks: ${hAvg}</span>`;
+                                    } else {
+                                        el.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.9rem;">no data</span>`;
+                                    }
+                                }
+                            });
                         }
                     }
                 }
             },
             scales: {
                 x: {
+                    type: 'time',
+                    min: chartMin.getTime(),
+                    max: chartMax.getTime(),
+                    time: {
+                        unit: 'hour',
+                        displayFormats: {
+                            hour: 'HH:mm'
+                        }
+                    },
                     display: true,
                     grid: {
                         drawBorder: false,
-                        drawTicks: false, // Turned off native ticks
+                        drawTicks: false,
                         color: function (context) {
-                            if (context.index !== undefined && historyData[context.index]) {
-                                const date = new Date(historyData[context.index].reported_hour);
-                                if (date.getHours() === 0) return "rgba(255, 255, 255, 0.15)"; // Midnight vertical gridline
+                            if (context.tick && context.tick.value) {
+                                const date = new Date(context.tick.value);
+                                if (date.getHours() === 0) return "rgba(255, 255, 255, 0.15)";
                             }
                             return "transparent";
                         }
                     },
                     ticks: {
-                        color: "transparent", // Hide native text, drawn by custom xAxisLabelsPlugin to ensure true sub-pixel layout centering
+                        color: "transparent",
                         font: { size: 11, family: "Inter", weight: "bold" },
                         maxRotation: 0,
                         autoSkip: false,
-                        padding: 16, // Pushes x-axis labels down slightly
-                        callback: function (value, index) {
-                            if (midpointIndices.has(index) && historyData[index]) {
-                                const date = new Date(historyData[index].reported_hour);
-                                const day = date.toLocaleDateString([], { weekday: 'short' });
-                                return `${day} ${date.getMonth() + 1}/${date.getDate()}`; // Date label dynamically centered with descriptive day attached
-                            }
-                            // Empty string ensures the tick still exists for the midnight gridline,
-                            // without drawing overlapping text text labels.
-                            return "";
-                        }
+                        padding: 30
                     }
                 },
                 y: {
                     display: true,
                     min: 0,
+                    max: totalCapacity,
                     grid: {
-                        color: "rgba(255, 255, 255, 0.05)",
+                        color: function (context) {
+                            if (context.tick.value === 0) return "rgba(255, 255, 255, 0.4)";
+                            return "rgba(255, 255, 255, 0.05)";
+                        },
                         drawBorder: false,
-                        borderDash: [5, 5]
+                        borderDash: function (context) {
+                            if (context.tick.value === 0) return [];
+                            return [5, 5];
+                        }
                     },
                     ticks: {
                         color: "#94a3b8",

@@ -1,43 +1,21 @@
 import os
-import yaml
 import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import psycopg2
 from psycopg2.extras import RealDictCursor
-from dotenv import load_dotenv
+from app.shared import get_db_connection
 
-load_dotenv("settings.env")
-load_dotenv("secrets.env", override=True)
-
-
-def get_db_connection():
-    conn = psycopg2.connect(
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        dbname=os.getenv("DB_NAME"),
-    )
-    return conn
-
-def load_groups():
-    config_path = os.path.join(os.path.dirname(__file__), "config", "groups.yaml")
-    if not os.path.exists(config_path):
-        return []
-    with open(config_path, "r") as f:
-        data = yaml.safe_load(f)
-    return data.get("groups", [])
+# Default User ID for current phase
+DEFAULT_USER_ID = "11111111-1111-1111-1111-111111111111"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    app.state.groups = load_groups()
+    # Startup tasks if needed
     yield
-    # Shutdown
+    # Shutdown tasks if needed
 
-app = FastAPI(title="Citi Bike Parking Tracker", lifespan=lifespan)
+app = FastAPI(title="Citi Bike Parking Tracker — Master API", lifespan=lifespan)
 
 # CORS is handled by nginx in production, but allow it here for local dev
 app.add_middleware(
@@ -47,37 +25,42 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
-@app.get("/groups")
-def get_groups():
-    return {"groups": app.state.groups}
-
 @app.get("/current")
+@app.get("/current/")
 @app.get("/")
-def get_current_availability():
+def get_current_availability(user_id: str = DEFAULT_USER_ID):
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Efficiently query only the stations assigned to this user's groups
             cur.execute("""
-                SELECT * FROM consumption.con_station_status_current
-            """)
+                SELECT 
+                    c.*,
+                    sg.name as group_name
+                FROM consumption.con_station_status_current c
+                JOIN app.station_group_stations sgs ON c.station_id = sgs.station_id
+                JOIN app.station_groups sg ON sgs.station_group_id = sg.id
+                WHERE sg.user_id = %s
+                ORDER BY sg.name, sgs.sort_order;
+            """, (user_id,))
             rows = cur.fetchall()
             
-            # Map by station_id for quick lookup
-            station_map = {str(r["station_id"]): dict(r) for r in rows}
+            # Group rows by group_name
+            groups_map = {}
+            for r in rows:
+                g_name = r["group_name"]
+                if g_name not in groups_map:
+                    groups_map[g_name] = {"name": g_name, "stations": []}
+                
+                # Cleanup row for JSON response
+                st = dict(r)
+                del st["group_name"]
+                if st.get("last_reported") and not isinstance(st["last_reported"], str):
+                    st["last_reported"] = st["last_reported"].isoformat()
+                
+                groups_map[g_name]["stations"].append(st)
             
-            result = []
-            for group in app.state.groups:
-                group_data = {"name": group["name"], "stations": []}
-                for sid in group.get("stations", []):
-                    if str(sid) in station_map:
-                        # Convert datetime to ISO string
-                        st = dict(station_map.get(str(sid), {}))
-                        if st:
-                            if st.get("last_reported") and not isinstance(st["last_reported"], str):
-                                st["last_reported"] = st["last_reported"].isoformat()
-                            group_data["stations"].append(st)
-                result.append(group_data)
-            return {"data": result}
+            return {"data": list(groups_map.values())}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=traceback.format_exc())
@@ -85,48 +68,56 @@ def get_current_availability():
         conn.close()
 
 @app.get("/history")
-def get_history_availability():
+@app.get("/history/")
+def get_history_availability(user_id: str = DEFAULT_USER_ID):
     conn = get_db_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Query history only for stations assigned to this user
             cur.execute("""
                 SELECT 
-                    station_id,
-                    reported_hour,
-                    min_docks_available,
-                    avg_docks_available,
-                    max_docks_available
-                FROM consumption.con_station_availability_history
-                ORDER BY reported_hour ASC
-            """)
+                    h.station_id,
+                    h.reported_hour,
+                    h.min_docks_available,
+                    h.avg_docks_available,
+                    h.max_docks_available,
+                    sg.name as group_name
+                FROM consumption.con_station_availability_history h
+                JOIN app.station_group_stations sgs ON h.station_id = sgs.station_id
+                JOIN app.station_groups sg ON sgs.station_group_id = sg.id
+                WHERE sg.user_id = %s
+                ORDER BY h.reported_hour ASC;
+            """, (user_id,))
             rows = cur.fetchall()
             
-            # Organize by station_id
-            history_map = {}
+            # Organize by group name and then station_id
+            groups_map = {}
             for raw_r in rows:
                 r = dict(raw_r)
+                g_name = r["group_name"]
                 sid = str(r["station_id"])
-                if sid not in history_map:
-                    history_map[sid] = []
+                
+                if g_name not in groups_map:
+                    groups_map[g_name] = {"name": g_name, "stations": {}}
+                
+                if sid not in groups_map[g_name]["stations"]:
+                    groups_map[g_name]["stations"][sid] = []
                 
                 if r.get("reported_hour"):
                     r["reported_hour"] = r["reported_hour"].isoformat()
                 
-                # Conversion to primitive types
+                # Convert Decimals to floats for JSON
                 r["min_docks_available"] = float(r["min_docks_available"]) if r.get("min_docks_available") is not None else 0.0
                 r["avg_docks_available"] = float(r["avg_docks_available"]) if r.get("avg_docks_available") is not None else 0.0
                 r["max_docks_available"] = float(r["max_docks_available"]) if r.get("max_docks_available") is not None else 0.0
                 
-                history_map[sid].append(r)
+                # Cleanup the row
+                del r["group_name"]
+                groups_map[g_name]["stations"][sid].append(r)
                 
-            result = []
-            for group in app.state.groups:
-                group_data = {"name": group["name"], "stations": {}}
-                for sid in group.get("stations", []):
-                    group_data["stations"][str(sid)] = history_map.get(str(sid), [])
-                result.append(group_data)
-            return {"data": result}
+            return {"data": list(groups_map.values())}
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()

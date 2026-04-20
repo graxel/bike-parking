@@ -1,7 +1,6 @@
 """Shared utilities for all bike-parking microservices."""
 
 import os
-import yaml
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
@@ -19,12 +18,3 @@ def get_db_connection():
         dbname=os.getenv("DB_NAME"),
     )
     return conn
-
-
-def load_groups():
-    config_path = os.path.join(os.path.dirname(__file__), "config", "groups.yaml")
-    if not os.path.exists(config_path):
-        return []
-    with open(config_path, "r") as f:
-        data = yaml.safe_load(f)
-    return data.get("groups", [])

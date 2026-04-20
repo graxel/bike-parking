@@ -7,6 +7,7 @@ SELECT DISTINCT ON (station_id)
     lon,
     num_bikes_available,
     num_docks_available,
+    capacity,
     reported_at
 FROM {{ ref('int_station_status') }}
 ORDER BY station_id, reported_at DESC

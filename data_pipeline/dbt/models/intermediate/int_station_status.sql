@@ -1,7 +1,8 @@
 {{ 
     config(
         materialized='incremental',
-        unique_key=['station_id', 'reported_at']
+        unique_key=['station_id', 'reported_at'],
+        on_schema_change='append_new_columns'
     ) 
 }}
 
@@ -11,6 +12,7 @@ WITH new_data AS (
         i.name as station_name,
         i.lat,
         i.lon,
+        i.capacity,
         s.num_bikes_available,
         s.num_docks_available,
         s.last_reported as reported_at,
@@ -32,6 +34,7 @@ SELECT DISTINCT ON (station_id, reported_at)
     station_name,
     lat,
     lon,
+    capacity,
     num_bikes_available,
     num_docks_available,
     reported_at,
