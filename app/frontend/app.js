@@ -21,7 +21,7 @@ const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const API_CONFIGS = {
     // Use local Nginx proxies when developing locally to bypass CORS,
     // otherwise use absolute URLs for the deployed Github Pages site.
-    prod: isLocal ? "/bike-parking/prod-proxy" : "https://data.kevingrazel.com:4443/bike-parking",
+    prod: isLocal ? "/bike-parking/prod-proxy" : "https://data.kevingrazel.com/bike-parking",
     qa: isLocal ? "/bike-parking/qa-proxy" : "https://data.kevingrazel.com:4443/bike-parking",
     dev: `${window.location.origin}/bike-parking`,
 };
@@ -29,13 +29,11 @@ const API_CONFIGS = {
 function getApiBase() {
     const params = new URLSearchParams(window.location.search);
     const env = params.get("api");
-    if (env) return API_CONFIGS[env] || API_CONFIGS.prod;
 
-    // Default to local for localhost, prod for remote
-    if (isLocal) {
-        return API_CONFIGS.dev;
-    }
-    return API_CONFIGS.prod;
+    if (env) return API_CONFIGS[env] || API_CONFIGS.qa;
+
+    // Default: dev for localhost, prod for remote
+    return isLocal ? API_CONFIGS.dev : API_CONFIGS.qa;
 }
 
 const API_BASE = getApiBase();
