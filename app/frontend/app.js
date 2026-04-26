@@ -366,7 +366,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
         }
     };
 
-    new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: "bar", // "Flying bricks" as vertical bars
         plugins: [midnightGridLinesPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
         data: {
@@ -559,4 +559,46 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             }
         }
     });
+
+    // On mobile, tapping the chart triggers the hover state. 
+    // We want the hover state to immediately clear when the user lifts their finger.
+    const clearHoverState = (e) => {
+        // Prevent the browser from firing synthetic mousemove/click events
+        // immediately after the touchend, which would re-trigger the chart hover.
+        if (e && e.cancelable && e.type.startsWith('touch')) {
+            e.preventDefault();
+        }
+
+        // Delay the clear slightly so any pending Chart.js animation frames 
+        // (from a late touchmove) are processed first, ensuring our clear isn't overwritten.
+        setTimeout(() => {
+            // Clear Chart.js internal state
+            chart.setActiveElements([]);
+            chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart.update();
+
+            // Force an immediate synchronous reset of the HUD and UI elements
+            // bypassing any async Chart.js render queues.
+            const hudEl = document.getElementById(hudId);
+            if (hudEl) hudEl.innerHTML = defaultHudText;
+
+            const dateAreaEl = document.getElementById(`date-area-${groupSlug}`);
+            if (dateAreaEl) dateAreaEl.style.visibility = "hidden";
+
+            groupStations.forEach(s => {
+                const sId = `station-${s.station_id}-val-${groupSlug}`;
+                const elId = document.getElementById(sId);
+                if (elId) {
+                    const safeDocks = Math.round(s.num_docks_available || 0);
+                    const paddedDocks = (safeDocks >= 0 && safeDocks < 10) ? `<span style="visibility: hidden;">0</span>${safeDocks}` : `${safeDocks}`;
+                    elId.innerHTML = `<span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">docks: ${paddedDocks}</span>`;
+                }
+            });
+        }, 50);
+    };
+
+    // { passive: false } is required so we can call e.preventDefault()
+    el.addEventListener('touchend', clearHoverState, { passive: false });
+    el.addEventListener('touchcancel', clearHoverState, { passive: false });
+    el.addEventListener('mouseleave', clearHoverState);
 }

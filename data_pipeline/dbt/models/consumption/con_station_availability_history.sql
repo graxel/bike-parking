@@ -13,7 +13,7 @@ SELECT
     MAX(num_docks_available) as max_docks_available,
     ROUND(AVG(num_docks_available), 1) as avg_docks_available
 FROM {{ ref('int_station_status') }}
-WHERE reported_at >= CURRENT_DATE - INTERVAL '8 days'
+WHERE reported_at >= CURRENT_DATE - INTERVAL '7 days'
 GROUP BY 
     station_id,
     station_name,
