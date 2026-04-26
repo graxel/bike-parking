@@ -1,8 +1,13 @@
 /*
+ * Note: Webpage hosted on kevingrazel.com (Github pages).
+ * kevingrazel.com and data.kevingrazel.com are completely
+ * separate hosts with separate infrastructure.
+ *
+ *
  * API Configuration
- * 
- * The frontend and APIs live on data.kevingrazel.com (Local/RPi infrastructure).
- * 
+ *
+ * The APIs live on data.kevingrazel.com (Local/RPi infrastructure).
+ *
  * All requests are routed through a consolidated Nginx gateway:
  *   /bike-parking/current/ -> Consolidated API (port 40501)
  *   /bike-parking/history/ -> Consolidated API (port 40501)
@@ -11,11 +16,14 @@
  *   Prod (Main): https://data.kevingrazel.com/bike-parking
  *   QA (Test):   https://data.kevingrazel.com:4443/bike-parking
  */
+const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
 const API_CONFIGS = {
-    prod: "https://data.kevingrazel.com/bike-parking",
-    qa:   "https://data.kevingrazel.com:4443/bike-parking",
-    // Always uses the current hostname (Mac IP or localhost) for local testing
-    dev:  `${window.location.origin}/bike-parking`,
+    // Use local Nginx proxies when developing locally to bypass CORS,
+    // otherwise use absolute URLs for the deployed Github Pages site.
+    prod: isLocal ? "/bike-parking/prod-proxy" : "https://data.kevingrazel.com:4443/bike-parking",
+    qa: isLocal ? "/bike-parking/qa-proxy" : "https://data.kevingrazel.com:4443/bike-parking",
+    dev: `${window.location.origin}/bike-parking`,
 };
 
 function getApiBase() {
@@ -24,7 +32,7 @@ function getApiBase() {
     if (env) return API_CONFIGS[env] || API_CONFIGS.prod;
 
     // Default to local for localhost, prod for remote
-    if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    if (isLocal) {
         return API_CONFIGS.dev;
     }
     return API_CONFIGS.prod;
@@ -79,10 +87,10 @@ function renderDashboard(currentGroups, historyGroups, container) {
             totalDocks += (station.num_docks_available || 0);
             totalCapacity += (station.capacity || 0);
             const stationSpanId = `station-${station.station_id}-val-${group.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
-            
+
             const safeDocks = Math.round(station.num_docks_available || 0);
             const paddedDocks = (safeDocks >= 0 && safeDocks < 10) ? `<span style="visibility: hidden;">0</span>${safeDocks}` : `${safeDocks}`;
-            
+
             stationsHtml += `
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem; align-items:center;">
                     <span style="color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 50%;">${station.station_name || 'Station ' + station.station_id}</span>
@@ -203,41 +211,41 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
         midpointIndices.add(mid);
     });
 
+    // Use local time for chart bounds because the chartjs-adapter-date-fns generates
+    // ticks in local time. Data timestamps (UTC ISO strings) are correctly converted
+    // to epoch ms by Date.parse(), so they align with local Date boundaries.
     const chartMin = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
     const chartMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() < 12 ? 0 : 1), 23, 59, 59, 999);
 
-    // High–low "bricks" plus average line
-    // Map to {x, y} format where x is a Date or ISO string for the time axis
     const highLowBars = historyData.map((d) => ({
-        x: d.reported_hour,
+        x: new Date(d.reported_hour).getTime() + 30 * 60 * 1000,
         y: [d.min_docks_available || 0, d.max_docks_available || 0]
     }));
 
-    const midnightDividerPlugin = {
-        id: 'midnightDivider',
+    const midnightGridLinesPlugin = {
+        id: 'midnightGridLines',
         beforeDraw: (chart) => {
             const ctx = chart.ctx;
             const xAxis = chart.scales.x;
             const yAxis = chart.scales.y;
-            
+
             ctx.save();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
             ctx.lineWidth = 1;
 
-            let currentDay = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate());
-            currentDay.setDate(currentDay.getDate() + 1); // Start dividing the next day boundaries
+            let currentDay = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate() + 1);
 
             while (currentDay <= chartMax) {
                 const x = xAxis.getPixelForValue(currentDay.getTime());
-                
+
                 // Only draw if within chart area visually
                 if (x >= xAxis.left && x <= xAxis.right) {
                     ctx.beginPath();
-                    ctx.moveTo(x, yAxis.bottom);
-                    ctx.lineTo(x, yAxis.bottom + 22);
+                    ctx.moveTo(x, yAxis.top);
+                    ctx.lineTo(x, yAxis.bottom + 40);
                     ctx.stroke();
                 }
-                currentDay.setDate(currentDay.getDate() + 1);
+                currentDay = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate() + 1);
             }
             ctx.restore();
         }
@@ -308,13 +316,12 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
 
-            // Loop through each day from chartMin to chartMax
+            // Loop through each local day from chartMin to chartMax
             let currentDay = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate());
             while (currentDay <= chartMax) {
                 const dayStart = Math.max(currentDay.getTime(), chartMin.getTime());
-                const nextDay = new Date(currentDay);
-                nextDay.setDate(currentDay.getDate() + 1);
-                
+                const nextDay = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate() + 1);
+
                 const dayEnd = Math.min(nextDay.getTime() - 1, chartMax.getTime());
 
                 // Find pixel positions
@@ -363,7 +370,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
 
     new Chart(ctx, {
         type: "bar", // "Flying bricks" as vertical bars
-        plugins: [midnightDividerPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
+        plugins: [midnightGridLinesPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
         data: {
             datasets: [
                 {
@@ -374,6 +381,9 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                     backgroundColor: "#1b4968",
                     borderWidth: 0,
                     borderSkipped: false,
+                    // By setting categoryPercentage and barPercentage to 1.0, 
+                    // the bar takes up 100% of the available space for its tick interval.
+                    // If the interval is 1 hour, the bar will be exactly 1 hour wide.
                     categoryPercentage: 1.0,
                     barPercentage: 1.0
                 }
@@ -391,6 +401,8 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                     mode: "index",
                     intersect: false,
                     external: function (context) {
+                        // This function handles the custom HTML tooltip / HUD updates.
+                        // It reads the raw data from `historyData` corresponding to the hovered bar.
                         const tooltipModel = context.tooltip;
                         const hudEl = document.getElementById(hudId);
                         const dateAreaEl = document.getElementById(`date-area-${groupSlug}`);
@@ -424,7 +436,10 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                             const d = historyData[dataIndex];
                             const hoverHour = d.reported_hour;
 
+                            // We read the original reported_hour string from the database (e.g., "2026-04-13T18:00:00+00:00")
+                            // and parse it into a JavaScript Date object.
                             const start = new Date(d.reported_hour);
+                            // We define the end of the interval as 1 hour (60 * 60 * 1000 ms) after the start.
                             const end = new Date(start.getTime() + 60 * 60 * 1000);
                             const day = start.toLocaleDateString([], { weekday: 'long' });
                             const startStr = start.toLocaleTimeString([], { hour: 'numeric' }).toLowerCase();
@@ -437,7 +452,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                                 if (num >= 0 && num < 10) {
                                     fixedStr = `<span style="visibility: hidden;">0</span>${fixedStr}`;
                                 }
-                                
+
                                 if (fixedStr.endsWith('.0')) {
                                     return `${fixedStr.slice(0, -2)}<span style="visibility: hidden;">.0</span>`;
                                 }
@@ -489,6 +504,8 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             },
             scales: {
                 x: {
+                    // The 'time' scale instructs Chart.js to treat the x-axis as a continuous timeline.
+                    // It maps the 'x' epoch ms values from our dataset exactly to their physical position on the axis.
                     type: 'time',
                     min: chartMin.getTime(),
                     max: chartMax.getTime(),
@@ -502,14 +519,10 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                     grid: {
                         drawBorder: false,
                         drawTicks: false,
-                        color: function (context) {
-                            if (context.tick && context.tick.value) {
-                                const date = new Date(context.tick.value);
-                                if (date.getHours() === 0) return "rgba(255, 255, 255, 0.15)";
-                            }
-                            return "transparent";
-                        }
+                        drawOnChartArea: true,
+                        color: "transparent"
                     },
+                    offset: false,
                     ticks: {
                         color: "transparent",
                         font: { size: 11, family: "Inter", weight: "bold" },
@@ -521,7 +534,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                 y: {
                     display: true,
                     min: 0,
-                    max: totalCapacity,
+                    // max: totalCapacity,
                     grid: {
                         color: function (context) {
                             if (context.tick.value === 0) return "rgba(255, 255, 255, 0.4)";

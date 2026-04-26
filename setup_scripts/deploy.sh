@@ -77,6 +77,20 @@ if [ "${ENV}" == "local" ]; then
 location /bike-parking/ {
     alias $(pwd)/app/frontend/;
     index index.html;
+}
+
+# --- QA Data Proxy (Bypasses CORS for local dev) ---
+location /bike-parking/qa-proxy/ {
+    proxy_pass https://data.kevingrazel.com:4443/bike-parking/;
+    proxy_ssl_server_name on;
+    proxy_set_header Host data.kevingrazel.com;
+}
+
+# --- Prod Data Proxy (Bypasses CORS for local dev) ---
+location /bike-parking/prod-proxy/ {
+    proxy_pass https://data.kevingrazel.com/bike-parking/;
+    proxy_ssl_server_name on;
+    proxy_set_header Host data.kevingrazel.com;
 }"
 fi
 
