@@ -10,3 +10,6 @@ logs/
 *.db
 secrets.env
 settings.env
+airflow/logs/
+data_pipeline/dbt/logs/
+data_pipeline/dbt/target/

@@ -6,5 +6,6 @@ SELECT
     (raw_json->>'capacity')::int as capacity,
     (raw_json->>'has_kiosk')::boolean as has_kiosk,
     (raw_json->>'region_id')::varchar as region_id,
-    ingested_at
+    ingested_at,
+    airflow_scheduled_time
 FROM {{ source('raw', 'station_information') }}

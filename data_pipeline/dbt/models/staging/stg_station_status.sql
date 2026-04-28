@@ -2,6 +2,7 @@ SELECT
     (raw_json->>'station_id')::varchar as station_id,
     to_timestamp((raw_json->>'last_reported')::numeric) as last_reported,
     ingested_at,
+    airflow_scheduled_time,
     (raw_json->>'num_docks_available')::int as num_docks_available,
     (raw_json->>'num_docks_disabled')::int as num_docks_disabled,
     (raw_json->>'num_bikes_available')::int as num_bikes_available,

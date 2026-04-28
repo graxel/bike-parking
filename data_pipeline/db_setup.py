@@ -20,7 +20,8 @@ def init_db(conn):
         cur.execute("""
             CREATE TABLE IF NOT EXISTS raw.station_status (
                 raw_json JSONB,
-                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                airflow_scheduled_time TIMESTAMP
             );
         """)
         
@@ -28,7 +29,8 @@ def init_db(conn):
             CREATE TABLE IF NOT EXISTS raw.station_information (
                 station_id VARCHAR(255) PRIMARY KEY,
                 raw_json JSONB,
-                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                airflow_scheduled_time TIMESTAMP
             );
         """)
 

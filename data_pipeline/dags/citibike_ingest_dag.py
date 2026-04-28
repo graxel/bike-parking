@@ -31,7 +31,7 @@ with DAG(
 
     ingest_task = BashOperator(
         task_id='run_ingest_script',
-        bash_command=f'cd {PROJECT_ROOT} && exec {VENV_PYTHON} data_pipeline/ingest.py',
+        bash_command=f'cd {PROJECT_ROOT} && exec {VENV_PYTHON} data_pipeline/ingest.py --scheduled-time "{{{{ ts }}}}"',
         execution_timeout=timedelta(seconds=20),
     )
 

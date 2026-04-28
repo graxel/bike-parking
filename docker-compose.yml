@@ -25,6 +25,10 @@ services:
       - "/bin/bash"
       - "-c"
       - |
+        echo "Waiting for postgres..."
+        until pg_isready -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER}; do
+          sleep 2
+        done
         airflow db migrate
         airflow users create \
           --username admin \
@@ -47,7 +51,7 @@ services:
       - AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True
       - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=5
       - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=5
-      - AIRFLOW__WEBSERVER__WORKERS=2
+      - AIRFLOW__WEBSERVER__WORKERS=3
     volumes:
       - ./airflow/logs:/bike-parking/airflow/logs
     # Wait for the database schema to be ready

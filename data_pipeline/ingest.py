@@ -1,4 +1,5 @@
 import os
+import argparse
 import logging
 from db_connection import get_db_connection
 from db_setup import init_db
@@ -13,7 +14,11 @@ logger = logging.getLogger(__name__)
 
 def main():
     """Main entry point for the Citi Bike ingestion process."""
-    logger.info(f"Starting ingestion process (PID: {os.getpid()})...")
+    parser = argparse.ArgumentParser(description="Ingest Citi Bike data.")
+    parser.add_argument("--scheduled-time", type=str, help="ISO8601 scheduled time from Airflow")
+    args = parser.parse_args()
+
+    logger.info(f"Starting ingestion process (PID: {os.getpid()}). Scheduled time: {args.scheduled_time}")
     conn = None
     try:
         conn = get_db_connection()
@@ -22,10 +27,10 @@ def main():
         init_db(conn)
         
         logger.info("Ingesting station information...")
-        ingest_information(conn)
+        ingest_information(conn, args.scheduled_time)
         
         logger.info("Ingesting station status...")
-        ingest_status(conn)
+        ingest_status(conn, args.scheduled_time)
         
         logger.info("Ingestion process completed successfully.")
         
