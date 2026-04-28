@@ -25,10 +25,18 @@ services:
       - "/bin/bash"
       - "-c"
       - |
-        echo "Waiting for postgres..."
-        until pg_isready -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER}; do
+        until python3 -c "
+        import psycopg2, os, sys
+        try:
+            psycopg2.connect(host=os.environ['DB_HOST'], port=os.environ['DB_PORT'], dbname=os.environ['DB_NAME'], user=os.environ['DB_USER'], password=os.environ['DB_PASSWORD'])
+            sys.exit(0)
+        except:
+            sys.exit(1)
+        " 2>/dev/null; do
+          echo "still waiting..."
           sleep 2
         done
+        echo "Postgres is ready"
         airflow db migrate
         airflow users create \
           --username admin \
