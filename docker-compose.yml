@@ -3,6 +3,7 @@ services:
   api:
     build: .
     env_file: .env
+    restart: unless-stopped
     ports:
       - "${HISTORY_PORT}:${HISTORY_PORT}"
     depends_on:
@@ -39,6 +40,7 @@ services:
   airflow-webserver:
     build: .
     env_file: .env
+    restart: unless-stopped
     ports:
       - "${AIRFLOW_WEBSERVER_PORT}:${AIRFLOW_WEBSERVER_PORT}"
     environment:
@@ -62,6 +64,7 @@ services:
     build: .
     hostname: airflow-scheduler
     env_file: .env
+    restart: unless-stopped
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public
       - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow
