@@ -33,7 +33,7 @@ function getApiBase() {
     if (env) return API_CONFIGS[env] || API_CONFIGS.qa;
 
     // Default: dev for localhost, prod for remote
-    return isLocal ? API_CONFIGS.dev : API_CONFIGS.qa;
+    return API_CONFIGS.qa;
 }
 
 const API_BASE = getApiBase();
@@ -215,9 +215,14 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
     const chartMin = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
     const chartMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() < 12 ? 0 : 1), 23, 59, 59, 999);
 
-    const highLowBars = historyData.map((d) => ({
+    const lowerBars = historyData.map((d) => ({
         x: new Date(d.reported_hour).getTime() + 30 * 60 * 1000,
-        y: [d.min_docks_available || 0, d.max_docks_available || 0]
+        y: [d.min_docks_available || 0, d.avg_docks_available || 0]
+    }));
+
+    const upperBars = historyData.map((d) => ({
+        x: new Date(d.reported_hour).getTime() + 30 * 60 * 1000,
+        y: [d.avg_docks_available || 0, d.max_docks_available || 0]
     }));
 
     const midnightGridLinesPlugin = {
@@ -249,6 +254,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
         }
     };
 
+    /*
     const averageLinesPlugin = {
         id: 'averageLines',
         afterDatasetsDraw: (chart) => {
@@ -297,6 +303,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             ctx.restore();
         }
     };
+    */
 
     const xAxisLabelsPlugin = {
         id: 'xAxisLabels',
@@ -366,22 +373,70 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
         }
     };
 
+    const lowerBgColor = function(context) {
+        const chart = context.chart;
+        const {ctx, chartArea} = chart;
+        if (!chartArea) return null;
+        if (context.type !== 'data') return 'transparent';
+        const meta = chart.getDatasetMeta(context.datasetIndex);
+        const element = meta.data[context.dataIndex];
+        if (!element) return 'transparent';
+        
+        const yTop = element.y;
+        const yBottom = element.base;
+        if (yTop === yBottom) return "#235c84";
+
+        const gradient = ctx.createLinearGradient(0, yTop, 0, yBottom);
+        gradient.addColorStop(0, "#235c84"); // more prominent (avg)
+        gradient.addColorStop(1, "#14354c"); // less prominent (min)
+        return gradient;
+    };
+
+    const upperBgColor = function(context) {
+        const chart = context.chart;
+        const {ctx, chartArea} = chart;
+        if (!chartArea) return null;
+        if (context.type !== 'data') return 'transparent';
+        const meta = chart.getDatasetMeta(context.datasetIndex);
+        const element = meta.data[context.dataIndex];
+        if (!element) return 'transparent';
+        
+        const yTop = element.y;
+        const yBottom = element.base;
+        if (yTop === yBottom) return "#235c84";
+
+        const gradient = ctx.createLinearGradient(0, yTop, 0, yBottom);
+        gradient.addColorStop(0, "#14354c"); // less prominent (max)
+        gradient.addColorStop(1, "#235c84"); // more prominent (avg)
+        return gradient;
+    };
+
     const chart = new Chart(ctx, {
         type: "bar", // "Flying bricks" as vertical bars
-        plugins: [midnightGridLinesPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
+        plugins: [midnightGridLinesPlugin, /*averageLinesPlugin,*/ xAxisLabelsPlugin, hoverHighlightPlugin],
         data: {
             datasets: [
                 {
-                    label: "High–Low Range",
+                    label: "Lower Range",
                     type: "bar",
-                    data: highLowBars,
+                    grouped: false,
+                    data: lowerBars,
                     borderColor: "transparent",
-                    backgroundColor: "#1b4968",
+                    backgroundColor: lowerBgColor,
                     borderWidth: 0,
                     borderSkipped: false,
-                    // By setting categoryPercentage and barPercentage to 1.0, 
-                    // the bar takes up 100% of the available space for its tick interval.
-                    // If the interval is 1 hour, the bar will be exactly 1 hour wide.
+                    categoryPercentage: 1.0,
+                    barPercentage: 1.0
+                },
+                {
+                    label: "Upper Range",
+                    type: "bar",
+                    grouped: false,
+                    data: upperBars,
+                    borderColor: "transparent",
+                    backgroundColor: upperBgColor,
+                    borderWidth: 0,
+                    borderSkipped: false,
                     categoryPercentage: 1.0,
                     barPercentage: 1.0
                 }
