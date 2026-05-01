@@ -16,7 +16,8 @@
  *   Prod (Main): https://data.kevingrazel.com/bike-parking
  *   QA (Test):   https://data.kevingrazel.com:4443/bike-parking
  */
-const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+    || /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(window.location.hostname);
 
 const API_CONFIGS = {
     // Use local Nginx proxies when developing locally to bypass CORS,
@@ -33,7 +34,7 @@ function getApiBase() {
     if (env) return API_CONFIGS[env] || API_CONFIGS.qa;
 
     // Default: dev for localhost, prod for remote
-    return API_CONFIGS.qa;
+    return isLocal ? API_CONFIGS.dev : API_CONFIGS.qa;
 }
 
 const API_BASE = getApiBase();
@@ -149,6 +150,8 @@ function renderDashboard(currentGroups, historyGroups, container) {
             </div>
         `;
 
+        const overviewCanvasId = `overview-${canvasId}`;
+
         card.innerHTML = `
             <div class="group-header" style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: none; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: nowrap; gap: 10px;">
                 <div style="display: flex; flex-direction: column;">
@@ -160,8 +163,11 @@ function renderDashboard(currentGroups, historyGroups, container) {
                 </div>
                 <div id="${hudId}" style="display: flex; align-items: flex-start; justify-content: flex-end;">${defaultHudText}</div>
             </div>
-            <div class="chart-container" style="height: 265px; margin-bottom: 1rem;">
+            <div class="chart-container" style="height: 265px; margin-bottom: 0.25rem;">
                 <canvas id="${canvasId}"></canvas>
+            </div>
+            <div id="overview-wrapper-${groupSlug}" class="chart-container" style="height: 60px; margin-bottom: 1rem; display: none;">
+                <canvas id="${overviewCanvasId}"></canvas>
             </div>
             ${stationsHtml}
         `;
@@ -215,15 +221,57 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
     const chartMin = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
     const chartMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() < 12 ? 0 : 1), 23, 59, 59, 999);
 
-    const lowerBars = historyData.map((d) => ({
+    // Focus-plus-context: on mobile, the detail chart shows a window sized
+    // by a fixed pixels-per-hour ratio so bar density is consistent across
+    // devices. The full 8-day plot is FULL_PLOT_PX wide; the viewport shows
+    // whatever fraction of that fits on the screen.
+    const isMobile = window.innerWidth <= 768;
+    const FULL_RANGE_MS = chartMax.getTime() - chartMin.getTime();
+    const FULL_PLOT_PX = 1600; // fixed pixel width for the full 8-day plot
+    const viewportPx = el.parentElement ? el.parentElement.clientWidth : window.innerWidth;
+    const DETAIL_WINDOW_MS = Math.min(FULL_RANGE_MS, (viewportPx / FULL_PLOT_PX) * FULL_RANGE_MS);
+
+    let dMin = chartMax.getTime() - DETAIL_WINDOW_MS;
+    let dMax = chartMax.getTime();
+
+    // On smaller screens where we aren't showing the full range, 
+    // ensure 'now' is at least at the center of the plot.
+    if (DETAIL_WINDOW_MS < FULL_RANGE_MS) {
+        const centerTime = dMin + DETAIL_WINDOW_MS / 2;
+        if (now.getTime() < centerTime) {
+            dMin = now.getTime() - DETAIL_WINDOW_MS / 2;
+            dMax = dMin + DETAIL_WINDOW_MS;
+        }
+
+        // Clamp to global bounds
+        if (dMin < chartMin.getTime()) {
+            dMin = chartMin.getTime();
+            dMax = dMin + DETAIL_WINDOW_MS;
+        }
+        if (dMax > chartMax.getTime()) {
+            dMax = chartMax.getTime();
+            dMin = dMax - DETAIL_WINDOW_MS;
+        }
+    }
+
+    const detailState = { min: dMin, max: dMax };
+
+    // Pre-compute bar data for the full dataset (used by overview chart)
+    const allHighLowBars = historyData.map((d) => ({
         x: new Date(d.reported_hour).getTime() + 30 * 60 * 1000,
-        y: [d.min_docks_available || 0, d.avg_docks_available || 0]
+        y: [d.min_docks_available || 0, d.max_docks_available || 0]
     }));
 
-    const upperBars = historyData.map((d) => ({
-        x: new Date(d.reported_hour).getTime() + 30 * 60 * 1000,
-        y: [d.avg_docks_available || 0, d.max_docks_available || 0]
-    }));
+    // Compute a global y-max from ALL data so the y-axis doesn't jitter
+    // when the detail window pans across different peaks.
+    const globalYMax = Math.max(...historyData.map(d => d.max_docks_available || 0));
+
+    // For the detail chart, filter to only bars within the visible range.
+    // This function is called on every pan to re-filter.
+    const getVisibleBars = () => allHighLowBars.filter(
+        b => b.x >= detailState.min && b.x <= detailState.max
+    );
+    let highLowBars = isMobile ? getVisibleBars() : allHighLowBars;
 
     const midnightGridLinesPlugin = {
         id: 'midnightGridLines',
@@ -254,7 +302,17 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
         }
     };
 
-    /*
+    // Pre-build lookup maps keyed by bar x-timestamp (epoch ms with 30-min offset).
+    // This decouples plugins and the tooltip from the historyData array index, which
+    // matters on mobile where the detail chart's dataset is a filtered subset.
+    const avgByTimestamp = {};
+    const historyByTimestamp = {};
+    historyData.forEach(d => {
+        const ts = new Date(d.reported_hour).getTime() + 30 * 60 * 1000; // match bar x offset
+        avgByTimestamp[ts] = d.avg_docks_available || 0;
+        historyByTimestamp[ts] = d;
+    });
+
     const averageLinesPlugin = {
         id: 'averageLines',
         afterDatasetsDraw: (chart) => {
@@ -269,10 +327,13 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             ctx.strokeStyle = "rgba(56, 189, 248, 1)"; // Same as box border blue
             ctx.lineWidth = 1.5; // 1.5x the weight of the box border
 
+            const dataset = chart.data.datasets[0].data;
             let isFirst = true;
 
-            historyData.forEach((d, index) => {
-                const avg = d.avg_docks_available || 0;
+            dataset.forEach((barData, index) => {
+                const avg = avgByTimestamp[barData.x];
+                if (avg === undefined) return;
+
                 const element = meta.data[index];
 
                 if (element && !element.hidden) {
@@ -282,9 +343,8 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
 
                     // Gap detection: If the time between points is strictly greater than our expected bucket interval...
                     if (index > 0) {
-                        const prevDate = new Date(historyData[index - 1].reported_hour);
-                        const currDate = new Date(d.reported_hour);
-                        if (currDate - prevDate > minInterval) {
+                        const prevX = dataset[index - 1].x;
+                        if (barData.x - prevX > minInterval) {
                             isFirst = true; // Break the average line to avoid bridging missing data
                         }
                     }
@@ -303,7 +363,6 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             ctx.restore();
         }
     };
-    */
 
     const xAxisLabelsPlugin = {
         id: 'xAxisLabels',
@@ -321,13 +380,15 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             ctx.textAlign = "center";
             ctx.textBaseline = "top";
 
-            // Loop through each local day from chartMin to chartMax
-            let currentDay = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate());
-            while (currentDay <= chartMax) {
-                const dayStart = Math.max(currentDay.getTime(), chartMin.getTime());
+            // Loop through each local day visible in the current chart viewport
+            const scaleMin = new Date(xAxis.min);
+            const scaleMax = new Date(xAxis.max);
+            let currentDay = new Date(scaleMin.getFullYear(), scaleMin.getMonth(), scaleMin.getDate());
+            while (currentDay <= scaleMax) {
+                const dayStart = Math.max(currentDay.getTime(), scaleMin.getTime());
                 const nextDay = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate() + 1);
 
-                const dayEnd = Math.min(nextDay.getTime() - 1, chartMax.getTime());
+                const dayEnd = Math.min(nextDay.getTime() - 1, scaleMax.getTime());
 
                 // Find pixel positions
                 const xStart = xAxis.getPixelForValue(dayStart);
@@ -362,7 +423,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                 const element = meta.data[activePoint.index];
                 if (element) {
                     ctx.save();
-                    ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
                     const left = element.x - (element.width / 2);
                     const top = chart.chartArea.top;
                     const bottom = chart.chartArea.bottom;
@@ -373,70 +434,22 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
         }
     };
 
-    const lowerBgColor = function(context) {
-        const chart = context.chart;
-        const {ctx, chartArea} = chart;
-        if (!chartArea) return null;
-        if (context.type !== 'data') return 'transparent';
-        const meta = chart.getDatasetMeta(context.datasetIndex);
-        const element = meta.data[context.dataIndex];
-        if (!element) return 'transparent';
-        
-        const yTop = element.y;
-        const yBottom = element.base;
-        if (yTop === yBottom) return "#235c84";
-
-        const gradient = ctx.createLinearGradient(0, yTop, 0, yBottom);
-        gradient.addColorStop(0, "#235c84"); // more prominent (avg)
-        gradient.addColorStop(1, "#14354c"); // less prominent (min)
-        return gradient;
-    };
-
-    const upperBgColor = function(context) {
-        const chart = context.chart;
-        const {ctx, chartArea} = chart;
-        if (!chartArea) return null;
-        if (context.type !== 'data') return 'transparent';
-        const meta = chart.getDatasetMeta(context.datasetIndex);
-        const element = meta.data[context.dataIndex];
-        if (!element) return 'transparent';
-        
-        const yTop = element.y;
-        const yBottom = element.base;
-        if (yTop === yBottom) return "#235c84";
-
-        const gradient = ctx.createLinearGradient(0, yTop, 0, yBottom);
-        gradient.addColorStop(0, "#14354c"); // less prominent (max)
-        gradient.addColorStop(1, "#235c84"); // more prominent (avg)
-        return gradient;
-    };
-
     const chart = new Chart(ctx, {
         type: "bar", // "Flying bricks" as vertical bars
-        plugins: [midnightGridLinesPlugin, /*averageLinesPlugin,*/ xAxisLabelsPlugin, hoverHighlightPlugin],
+        plugins: [midnightGridLinesPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
         data: {
             datasets: [
                 {
-                    label: "Lower Range",
+                    label: "High–Low Range",
                     type: "bar",
-                    grouped: false,
-                    data: lowerBars,
+                    data: highLowBars,
                     borderColor: "transparent",
-                    backgroundColor: lowerBgColor,
+                    backgroundColor: "#1b4968",
                     borderWidth: 0,
                     borderSkipped: false,
-                    categoryPercentage: 1.0,
-                    barPercentage: 1.0
-                },
-                {
-                    label: "Upper Range",
-                    type: "bar",
-                    grouped: false,
-                    data: upperBars,
-                    borderColor: "transparent",
-                    backgroundColor: upperBgColor,
-                    borderWidth: 0,
-                    borderSkipped: false,
+                    // By setting categoryPercentage and barPercentage to 1.0, 
+                    // the bar takes up 100% of the available space for its tick interval.
+                    // If the interval is 1 hour, the bar will be exactly 1 hour wide.
                     categoryPercentage: 1.0,
                     barPercentage: 1.0
                 }
@@ -445,6 +458,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: { bottom: 40, left: 0, right: 0 } },
             plugins: {
                 legend: {
                     display: false // Dropped the legend natively
@@ -486,7 +500,9 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                         // If hovering a block, inject the bounds dynamically into the metrics and HUD
                         if (tooltipModel.body) {
                             const dataIndex = tooltipModel.dataPoints[0].dataIndex;
-                            const d = historyData[dataIndex];
+                            const barEntry = context.chart.data.datasets[0].data[dataIndex];
+                            const d = historyByTimestamp[barEntry.x];
+                            if (!d) return;
                             const hoverHour = d.reported_hour;
 
                             // We read the original reported_hour string from the database (e.g., "2026-04-13T18:00:00+00:00")
@@ -560,8 +576,8 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                     // The 'time' scale instructs Chart.js to treat the x-axis as a continuous timeline.
                     // It maps the 'x' epoch ms values from our dataset exactly to their physical position on the axis.
                     type: 'time',
-                    min: chartMin.getTime(),
-                    max: chartMax.getTime(),
+                    min: detailState.min,
+                    max: detailState.max,
                     time: {
                         unit: 'hour',
                         displayFormats: {
@@ -577,17 +593,13 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                     },
                     offset: false,
                     ticks: {
-                        color: "transparent",
-                        font: { size: 11, family: "Inter", weight: "bold" },
-                        maxRotation: 0,
-                        autoSkip: false,
-                        padding: 30
+                        display: false
                     }
                 },
                 y: {
                     display: true,
                     min: 0,
-                    // max: totalCapacity,
+                    max: globalYMax > 0 ? Math.ceil(globalYMax * 1.1) : undefined,
                     grid: {
                         color: function (context) {
                             if (context.tick.value === 0) return "rgba(255, 255, 255, 0.4)";
@@ -604,6 +616,9 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
                         font: { size: 10, family: "Inter" },
                         maxTicksLimit: 5,
                         padding: 10
+                    },
+                    afterFit: function (axis) {
+                        axis.width = 40; // Fixed width to ensure alignment with overview chart
                     }
                 }
             },
@@ -656,4 +671,200 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
     el.addEventListener('touchend', clearHoverState, { passive: false });
     el.addEventListener('touchcancel', clearHoverState, { passive: false });
     el.addEventListener('mouseleave', clearHoverState);
+
+    // ── Focus-plus-context: Overview chart with brush ──
+    // Show overview whenever the viewport is smaller than the full data range
+    if (DETAIL_WINDOW_MS >= FULL_RANGE_MS) {
+        const overviewWrapper = document.getElementById(`overview-wrapper-${groupSlug}`);
+        if (overviewWrapper) overviewWrapper.style.display = 'none';
+        return;
+    }
+
+    const overviewCanvasId = `overview-${canvasId}`;
+    const overviewWrapper = document.getElementById(`overview-wrapper-${groupSlug}`);
+    const overviewEl = document.getElementById(overviewCanvasId);
+    if (!overviewWrapper || !overviewEl) return;
+
+    overviewWrapper.style.display = 'block';
+    const overviewCtx = overviewEl.getContext('2d');
+
+    // Brush plugin: draws the selection window and dimmed regions on the overview chart
+    const brushPlugin = {
+        id: 'brushOverlay',
+        afterDatasetsDraw: (ovChart) => {
+            const ctx = ovChart.ctx;
+            const xAxis = ovChart.scales.x;
+            const area = ovChart.chartArea;
+
+            const leftPx = xAxis.getPixelForValue(detailState.min);
+            const rightPx = xAxis.getPixelForValue(detailState.max);
+
+            ctx.save();
+
+            // Dim the regions outside the brush window
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(area.left, area.top, leftPx - area.left, area.bottom - area.top);
+            ctx.fillRect(rightPx, area.top, area.right - rightPx, area.bottom - area.top);
+
+            // Draw brush window border
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(leftPx, area.top, rightPx - leftPx, area.bottom - area.top);
+
+            ctx.restore();
+        }
+    };
+
+    // Overview x-axis labels plugin (day abbreviations centered in each day)
+    const overviewLabelsPlugin = {
+        id: 'overviewLabels',
+        afterDraw: (ovChart) => {
+            const ctx = ovChart.ctx;
+            const xAxis = ovChart.scales.x;
+            const yAxis = ovChart.scales.y;
+
+            ctx.save();
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 9px Inter';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            let day = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate());
+            while (day <= chartMax) {
+                const nextDay = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+                const dayStart = Math.max(day.getTime(), chartMin.getTime());
+                const dayEnd = Math.min(nextDay.getTime() - 1, chartMax.getTime());
+                const center = (xAxis.getPixelForValue(dayStart) + xAxis.getPixelForValue(dayEnd)) / 2;
+
+                const label = day.toLocaleDateString([], { weekday: 'narrow' });
+                ctx.fillText(label, center, yAxis.bottom + 3);
+
+                day = nextDay;
+            }
+            ctx.restore();
+        }
+    };
+
+    const overviewChart = new Chart(overviewCtx, {
+        type: 'bar',
+        plugins: [brushPlugin, overviewLabelsPlugin],
+        data: {
+            datasets: [{
+                label: 'Overview',
+                type: 'bar',
+                data: allHighLowBars,
+                borderColor: 'transparent',
+                backgroundColor: '#1b4968',
+                borderWidth: 0,
+                borderSkipped: false,
+                categoryPercentage: 1.0,
+                barPercentage: 1.0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            layout: { padding: { bottom: 15, left: 0, right: 0 } },
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    min: chartMin.getTime(),
+                    max: chartMax.getTime(),
+                    time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+                    display: true,
+                    grid: { drawBorder: false, drawTicks: false, drawOnChartArea: false, color: 'transparent' },
+                    offset: false,
+                    ticks: { display: false }
+                },
+                y: {
+                    display: true, // true so it takes up horizontal space
+                    min: 0,
+                    max: globalYMax > 0 ? Math.ceil(globalYMax * 1.1) : undefined,
+                    grid: { display: false, drawBorder: false },
+                    ticks: {
+                        color: 'transparent', // invisible text
+                        font: { size: 10, family: "Inter" },
+                        maxTicksLimit: 5,
+                        padding: 10 // match main chart Y padding
+                    },
+                    afterFit: function (axis) {
+                        axis.width = 40; // Must match main chart exactly
+                    }
+                }
+            },
+            interaction: { mode: 'none' }
+        }
+    });
+
+    // ── Brush drag interaction on the overview canvas ──
+    // Touch and mouse events are scoped entirely to the overview chart.
+    // The detail chart handles its own tooltip/HUD events independently.
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartMin = 0;
+
+    const getEventX = (e) => {
+        if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
+        return e.clientX;
+    };
+
+    const onDragStart = (e) => {
+        isDragging = true;
+        dragStartX = getEventX(e);
+        dragStartMin = detailState.min;
+    };
+
+    const onDragMove = (e) => {
+        if (!isDragging) return;
+        // Prevent page scrolling while dragging the brush
+        if (e.cancelable) e.preventDefault();
+
+        const xAxis = overviewChart.scales.x;
+        const pxDelta = getEventX(e) - dragStartX;
+        // Convert pixel delta to time delta using the overview chart's scale
+        const timeDelta = (pxDelta / (xAxis.right - xAxis.left)) * (chartMax.getTime() - chartMin.getTime());
+
+        let newMin = dragStartMin + timeDelta;
+        let newMax = newMin + DETAIL_WINDOW_MS;
+
+        // Clamp to the global bounds
+        if (newMin < chartMin.getTime()) {
+            newMin = chartMin.getTime();
+            newMax = newMin + DETAIL_WINDOW_MS;
+        }
+        if (newMax > chartMax.getTime()) {
+            newMax = chartMax.getTime();
+            newMin = newMax - DETAIL_WINDOW_MS;
+        }
+
+        detailState.min = newMin;
+        detailState.max = newMax;
+
+        // Re-filter the detail chart's data to only include visible bars
+        chart.data.datasets[0].data = getVisibleBars();
+
+        // Update the detail chart's x-axis range and redraw
+        chart.options.scales.x.min = detailState.min;
+        chart.options.scales.x.max = detailState.max;
+        chart.update('none');
+
+        // Redraw the overview to update the brush overlay position
+        overviewChart.update('none');
+    };
+
+    const onDragEnd = () => {
+        isDragging = false;
+    };
+
+    overviewEl.addEventListener('mousedown', onDragStart);
+    overviewEl.addEventListener('touchstart', onDragStart, { passive: true });
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('touchmove', onDragMove, { passive: false });
+    window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('touchend', onDragEnd);
 }

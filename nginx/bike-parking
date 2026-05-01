@@ -138,3 +138,25 @@ location /bike-parking/airflow/ {
     proxy_set_header Connection $connection_upgrade;
     proxy_read_timeout 86400;
 }
+
+# --- Development Proxies (for LAN/Mobile testing) ----------------
+
+# QA Data Proxy (Bypasses CORS for local dev)
+location /bike-parking/qa-proxy/ {
+    proxy_pass https://data.kevingrazel.com:4443/bike-parking/;
+    proxy_ssl_server_name on;
+    proxy_set_header Host data.kevingrazel.com;
+    
+    # Simple CORS for local dev
+    add_header 'Access-Control-Allow-Origin' '*' always;
+}
+
+# Prod Data Proxy (Bypasses CORS for local dev)
+location /bike-parking/prod-proxy/ {
+    proxy_pass https://data.kevingrazel.com/bike-parking/;
+    proxy_ssl_server_name on;
+    proxy_set_header Host data.kevingrazel.com;
+
+    # Simple CORS for local dev
+    add_header 'Access-Control-Allow-Origin' '*' always;
+}

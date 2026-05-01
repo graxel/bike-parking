@@ -10,7 +10,12 @@
     --font-main: 'Inter', sans-serif;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
 body {
     background: var(--bg-gradient);
     color: var(--text-primary);
@@ -38,9 +43,23 @@ body {
     animation: slideDown 0.6s ease-out;
 }
 
-.header-logo { font-size: 3.5rem; margin-bottom: 0.5rem; }
-h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.5rem; color: #fff; }
-.subtitle { color: var(--text-secondary); font-size: 1.1rem; }
+.header-logo {
+    font-size: 3.5rem;
+    margin-bottom: 0.5rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+    color: #fff;
+}
+
+.subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
 
 .dashboard-grid {
     display: flex;
@@ -53,12 +72,23 @@ h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--surface-border);
-    border-radius: 20px;
-    padding: 1.5rem;
+    border-radius: 16px;
+    padding: 1.5rem 0;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
     transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
     animation: fadeIn 0.8s ease-out forwards;
     opacity: 0;
+}
+
+.group-header,
+.station-list {
+    padding-left: 1.0rem;
+    padding-right: 1.0rem;
+}
+
+.chart-container {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
 }
 
 .group-card:hover {
@@ -76,7 +106,11 @@ h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom
     border-bottom: 1px solid var(--surface-border);
 }
 
-.group-title { font-size: 1.5rem; font-weight: 600; color: var(--text-primary); }
+.group-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
 
 .station-item {
     margin-bottom: 1.5rem;
@@ -85,7 +119,10 @@ h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom
     border: 1px solid var(--surface-border);
     border-radius: 12px;
 }
-.station-item:last-child { margin-bottom: 0; }
+
+.station-item:last-child {
+    margin-bottom: 0;
+}
 
 .station-header {
     display: flex;
@@ -94,15 +131,31 @@ h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom
     margin-bottom: 0.8rem;
 }
 
-.station-name { font-weight: 500; font-size: 1.1rem; }
+.station-name {
+    font-weight: 500;
+    font-size: 1.1rem;
+}
+
 .station-metrics {
     display: flex;
     gap: 1rem;
     font-size: 0.95rem;
 }
-.metric { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; }
-.metric.bikes { color: var(--accent-color); }
-.metric.docks { color: var(--success-color); }
+
+.metric {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 500;
+}
+
+.metric.bikes {
+    color: var(--accent-color);
+}
+
+.metric.docks {
+    color: var(--success-color);
+}
 
 .chart-container {
     position: relative;
@@ -122,20 +175,72 @@ h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom
 
 /* Animations */
 @keyframes slideDown {
-    from { transform: translateY(-30px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(-30px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
+
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
+
 @keyframes pulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
+    }
 }
 
 @media (max-width: 768px) {
-    .dashboard-grid { grid-template-columns: 1fr; }
-    body { padding: 1rem; }
-    h1 { font-size: 2rem; }
+    .dashboard-grid {
+        gap: 1rem;
+    }
+
+    body {
+        padding: 0.5rem;
+    }
+
+    .glass-header {
+        padding: 1.5rem 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    h1 {
+        font-size: 1.75rem;
+    }
+
+    .group-card {
+        padding: 1.0rem 0;
+        border-radius: 12px;
+    }
+
+    .group-header,
+    .station-list {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+
+    .chart-container {
+        padding-left: 0.15rem;
+        padding-right: 0.15rem;
+    }
 }
