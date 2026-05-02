@@ -14,7 +14,7 @@
  *
  * Environment endpoints:
  *   Prod (Main): https://data.kevingrazel.com/bike-parking
- *   QA (Test):   https://data.kevingrazel.com:4443/bike-parking
+ *   QA (Test):   https://data.kevingrazel.com:8443/bike-parking
  */
 const isLocal = ["localhost", "127.0.0.1"].includes(window.location.hostname)
     || /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(window.location.hostname);
@@ -23,7 +23,7 @@ const API_CONFIGS = {
     // Use local Nginx proxies when developing locally to bypass CORS,
     // otherwise use absolute URLs for the deployed Github Pages site.
     prod: isLocal ? "/bike-parking/prod-proxy" : "https://data.kevingrazel.com/bike-parking",
-    qa: isLocal ? "/bike-parking/qa-proxy" : "https://data.kevingrazel.com:4443/bike-parking",
+    qa: isLocal ? "/bike-parking/qa-proxy" : "https://data.kevingrazel.com:8443/bike-parking",
     dev: `${window.location.origin}/bike-parking`,
 };
 
