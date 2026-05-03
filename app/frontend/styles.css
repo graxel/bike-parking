@@ -82,13 +82,13 @@ h1 {
 
 .group-header,
 .station-list {
-    padding-left: 1.0rem;
-    padding-right: 1.0rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 .chart-container {
-    padding-left: 0.25rem;
-    padding-right: 0.25rem;
+    padding-left: 0.5rem;
+    padding-right: 1rem;
 }
 
 .group-card:hover {
