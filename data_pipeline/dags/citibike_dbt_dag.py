@@ -29,5 +29,5 @@ with DAG(
         task_id='run_dbt_models',
         # Move into the dbt folder and run models using the profiles in that same folder
         bash_command=f'cd {PROJECT_ROOT}/data_pipeline/dbt && exec {VENV_DBT} run --profiles-dir .',
-        execution_timeout=timedelta(minutes=5),  # DBT runs can be slower
+        execution_timeout=timedelta(minutes=7),  # DBT runs can be slower
     )
