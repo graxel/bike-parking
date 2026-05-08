@@ -1,7 +1,7 @@
 {{ config(
     materialized='incremental',
-    unique_key='station_id',  -- Each station only has 1 row
-    incremental_strategy='merge'  -- or 'delete+insert'
+    unique_key='station_id',
+    incremental_strategy='merge'
 ) }}
  
 SELECT
