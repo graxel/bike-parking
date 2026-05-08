@@ -16,6 +16,9 @@ clean-targets:
 
 on-run-start:
   - "SET statement_timeout = 30000;"
+  - "CREATE INDEX IF NOT EXISTS idx_int_status_lookup ON intermediate.int_station_status (station_id, reported_at);"
+  - "CREATE INDEX IF NOT EXISTS idx_con_current_lookup ON consumption.con_station_status_current (station_id);"
+  - "CREATE INDEX IF NOT EXISTS idx_con_history_lookup ON consumption.con_station_availability_history (station_id, reported_hour);"
 
 models:
   citibike_dbt:

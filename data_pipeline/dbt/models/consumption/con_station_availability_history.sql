@@ -1,4 +1,12 @@
-{{ config(materialized='table') }}
+{{ config(
+    materialized='incremental',
+    unique_key=['station_id', 'reported_hour'],
+    incremental_strategy='delete+insert',
+    -- Re-process last 2 hours in case of late data
+    incremental_predicates = [
+        "DBT_INTERNAL_DEST.reported_hour >= date_trunc('hour', now() - interval '2 hours')"
+    ]
+) }}
 
 SELECT
     station_id,
@@ -14,12 +22,18 @@ SELECT
     ROUND(AVG(num_docks_available), 1) as avg_docks_available
 FROM {{ ref('int_station_status') }}
 WHERE reported_at >= CURRENT_DATE - INTERVAL '7 days'
+
+{% if is_incremental() %}
+    -- Only look at data since the last processed hour minus buffer
+    AND DATE_TRUNC('hour', reported_at) >= (
+        SELECT MAX(reported_hour) - INTERVAL '1 hour' 
+        FROM {{ this }}
+    )
+{% endif %}
+
 GROUP BY 
     station_id,
     station_name,
     lat,
     lon,
     DATE_TRUNC('hour', reported_at)
-ORDER BY 
-    station_id, 
-    reported_hour ASC
