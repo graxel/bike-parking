@@ -16,6 +16,5 @@ SELECT
 FROM {{ ref('int_station_status') }}
  
 {% if is_incremental() %}
-    -- Only get records newer than what we currently have
     WHERE reported_at > (SELECT MAX(reported_at) FROM {{ this }})
 {% endif %}
