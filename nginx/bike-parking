@@ -1,104 +1,14 @@
 # Bike Parking: Citi Bike dock availability tracker
 # Ports:
 #   40500 - Health/status (internal only)
-#   40501 - History API (FastAPI)
-#   40502 - Forecast API
-#   40503 - Panic API
+#   40501 - History/Current/Forecast API (FastAPI)
 #   40510 - Airflow webserver (internal only)
-#
-# /bike-parking is replaced at deploy time:
-#   prod → /bike-parking
-#   qa   → /bike-parking/beta
 
 
-# --- Public endpoints -------------------------------------------
-
-# History API (current availability + history)
-location /bike-parking/history/ {
-    proxy_pass http://127.0.0.1:40501/history;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix /bike-parking/history;
-
-    proxy_hide_header 'Access-Control-Allow-Origin';
-
-    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
-
-    if ($request_method = 'OPTIONS') {
-        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-        return 204;
-    }
+location /bike-parking/ {
+    proxy_pass http://127.0.0.1:40501/;
+    proxy_hide_header Access-Control-Allow-Origin;
 }
-
-# Current API
-location /bike-parking/current/ {
-    proxy_pass http://127.0.0.1:40501/current;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix /bike-parking/current;
-
-    proxy_hide_header 'Access-Control-Allow-Origin';
-
-    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
-
-    if ($request_method = 'OPTIONS') {
-        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-        return 204;
-    }
-}
-
-# Forecast API
-location /bike-parking/forecast/ {
-    proxy_pass http://127.0.0.1:40503/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix /bike-parking/forecast;
-
-    proxy_hide_header 'Access-Control-Allow-Origin';
-
-    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
-
-    if ($request_method = 'OPTIONS') {
-        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-        return 204;
-    }
-}
-
-# Panic API
-location /bike-parking/panic/ {
-    proxy_pass http://127.0.0.1:40504/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Prefix /bike-parking/panic;
-
-    proxy_hide_header 'Access-Control-Allow-Origin';
-
-    add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
-    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
-
-    if ($request_method = 'OPTIONS') {
-        add_header 'Access-Control-Allow-Origin' 'https://kevingrazel.com' always;
-        return 204;
-    }
-}
-
-
-# --- Internal-only endpoints (restrict to localhost / VPN) -------
 
 # Health check (internal)
 location /bike-parking/health/ {
@@ -106,14 +16,9 @@ location /bike-parking/health/ {
     allow 127.0.0.1;
     allow ::1;
     allow 192.168.0.0/16;
-    allow 10.0.0.0/8;
     deny all;
 
     proxy_pass http://127.0.0.1:40500/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
 }
 
 # Airflow webserver (internal)
@@ -122,7 +27,6 @@ location /bike-parking/airflow/ {
     allow 127.0.0.1;
     allow ::1;
     allow 192.168.0.0/16;
-    allow 10.0.0.0/8;
     deny all;
 
     proxy_pass http://127.0.0.1:40510/;
@@ -143,7 +47,7 @@ location /bike-parking/airflow/ {
 
 # QA Data Proxy (Bypasses CORS for local dev)
 location /bike-parking/qa-proxy/ {
-    proxy_pass https://data.kevingrazel.com:4443/bike-parking/;
+    proxy_pass https://data.kevingrazel.com:8443/bike-parking/;
     proxy_ssl_server_name on;
     proxy_set_header Host data.kevingrazel.com;
     

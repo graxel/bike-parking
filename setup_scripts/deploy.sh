@@ -68,15 +68,28 @@ CONFIG_CONTENT=$(cat nginx/bike-parking)
 
 # Add local-only overrides
 if [ "${ENV}" == "local" ]; then
-    # Relax CORS for local dev and append local frontend locations
+    # Relax CORS for local dev
     CONFIG_CONTENT=$(echo "${CONFIG_CONTENT}" | sed "s|'https://kevingrazel.com'|'*'|g")
     
+    # Remove the original catch-all proxy location (replaced with specific API routes + frontend)
+    CONFIG_CONTENT=$(echo "${CONFIG_CONTENT}" | sed '/^location \/bike-parking\/ {$/,/^}$/d')
+
+    # Add frontend serving and API proxy routes for local dev
     CONFIG_CONTENT="${CONFIG_CONTENT}
 
 # --- Frontend (Local Development) ---
+# API routes proxy to the container
+location /bike-parking/current/ {
+    proxy_pass http://127.0.0.1:40501/current/;
+}
+location /bike-parking/history/ {
+    proxy_pass http://127.0.0.1:40501/history/;
+}
+# Everything else serves static frontend files
 location /bike-parking/ {
     alias $(pwd)/app/frontend/;
     index index.html;
+    try_files \$uri \$uri/ /bike-parking/index.html;
 }
 "
 fi
