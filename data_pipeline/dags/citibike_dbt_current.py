@@ -16,17 +16,17 @@ default_args = {
 }
 
 with DAG(
-    'citibike_dbt_history',
+    'citibike_dbt_current',
     default_args=default_args,
-    description='Run dbt history models every 10 minutes',
-    schedule_interval='*/10 * * * *',
+    description='Run dbt current models every minute',
+    schedule_interval='* * * * *',
     catchup=False,
     max_active_runs=1,
     is_paused_upon_creation=False
 ) as dag:
 
     dbt_run_task = BashOperator(
-        task_id='run_dbt_history_models',
-        bash_command=f'cd {PROJECT_ROOT}/data_pipeline/dbt && exec {VENV_DBT} run --select tag:history --profiles-dir .',
-        execution_timeout=timedelta(minutes=7),
+        task_id='run_dbt_current_models',
+        bash_command=f'cd {PROJECT_ROOT}/data_pipeline/dbt && exec {VENV_DBT} run --select tag:current --profiles-dir .',
+        execution_timeout=timedelta(minutes=2),
     )

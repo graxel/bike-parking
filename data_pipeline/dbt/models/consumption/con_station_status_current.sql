@@ -1,7 +1,8 @@
 {{ config(
     materialized='incremental',
     unique_key='station_id',
-    incremental_strategy='merge'
+    incremental_strategy='merge',
+    tags=['current']
 ) }}
  
 SELECT
