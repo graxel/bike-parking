@@ -48,6 +48,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             fetch(`${API_BASE}/history/`)
         ]);
 
+        if (!currentRes.ok) {
+            const text = await currentRes.text();
+            throw new Error(`API /current/ failed: ${currentRes.status} ${currentRes.statusText} - ${text.slice(0, 200)}`);
+        }
+        if (!historyRes.ok) {
+            const text = await historyRes.text();
+            throw new Error(`API /history/ failed: ${historyRes.status} ${historyRes.statusText} - ${text.slice(0, 200)}`);
+        }
+
         const currentData = await currentRes.json();
         const historyData = await historyRes.json();
 
@@ -271,7 +280,7 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
     const getVisibleBars = () => allHighLowBars.filter(
         b => b.x >= detailState.min && b.x <= detailState.max
     );
-    let highLowBars = isMobile ? getVisibleBars() : allHighLowBars;
+    let highLowBars = getVisibleBars();
 
     const midnightGridLinesPlugin = {
         id: 'midnightGridLines',
@@ -323,6 +332,10 @@ function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity
             if (!meta || meta.hidden) return;
 
             ctx.save();
+            ctx.beginPath();
+            ctx.rect(chart.chartArea.left, chart.chartArea.top, chart.chartArea.width, chart.chartArea.height);
+            ctx.clip();
+            
             ctx.beginPath();
             ctx.strokeStyle = "rgba(56, 189, 248, 1)"; // Same as box border blue
             ctx.lineWidth = 1.5; // 1.5x the weight of the box border
