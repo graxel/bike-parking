@@ -21,13 +21,17 @@ SELECT
     MAX(num_docks_available) as max_docks_available,
     ROUND(AVG(num_docks_available), 1) as avg_docks_available
 FROM {{ ref('int_station_status') }}
-WHERE reported_at >= CURRENT_DATE - INTERVAL '7 days'
 
 {% if is_incremental() %}
-    AND DATE_TRUNC('hour', reported_at) >= (
-        SELECT MAX(reported_hour) - INTERVAL '1 hour' 
+    WHERE DATE_TRUNC('hour', reported_at) >= (
+        SELECT GREATEST(
+            MAX(reported_hour) - INTERVAL '2 hours',
+            date_trunc('hour', now() - interval '8 hours')
+        )
         FROM {{ this }}
     )
+{% else %}
+    WHERE reported_at >= CURRENT_DATE - INTERVAL '7 days'
 {% endif %}
 
 GROUP BY 
