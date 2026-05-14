@@ -1,10 +1,6 @@
 {{ config(
     materialized='incremental',
     unique_key=['station_id', 'reported_hour'],
-    incremental_strategy='delete+insert',
-    incremental_predicates = [
-        "DBT_INTERNAL_DEST.reported_hour >= date_trunc('hour', now() - interval '2 hours')"
-    ],
     tags=['history']
 ) }}
 

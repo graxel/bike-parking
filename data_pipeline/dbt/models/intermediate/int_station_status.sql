@@ -2,7 +2,8 @@
     config(
         materialized='incremental',
         unique_key=['station_id', 'reported_at'],
-        on_schema_change='append_new_columns'
+        on_schema_change='append_new_columns',
+        tags=['current']
     ) 
 }}
 
