@@ -1,6 +1,6 @@
 # Bike Parking: Citi Bike dock availability tracker
 # Ports:
-#   40500 - Health/status (internal only)
+#   40500 - Health/status API
 #   40501 - History/Current/Forecast API (FastAPI)
 #   40510 - Airflow webserver (internal only)
 
@@ -10,14 +10,8 @@ location /bike-parking/ {
     proxy_hide_header Access-Control-Allow-Origin;
 }
 
-# Health check (internal)
+# Health check
 location /bike-parking/health/ {
-    # Restrict access: only local and private networks
-    allow 127.0.0.1;
-    allow ::1;
-    allow 192.168.0.0/16;
-    deny all;
-
     proxy_pass http://127.0.0.1:40500/;
 }
 

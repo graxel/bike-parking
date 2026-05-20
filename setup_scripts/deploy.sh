@@ -66,33 +66,7 @@ $SUDO mkdir -p "${NGINX_ENABLED_APPS_DIR}"
 echo "==> Generating nginx config"
 CONFIG_CONTENT=$(cat nginx/bike-parking)
 
-# Add local-only overrides
-if [ "${ENV}" == "local" ]; then
-    # Relax CORS for local dev
-    CONFIG_CONTENT=$(echo "${CONFIG_CONTENT}" | sed "s|'https://kevingrazel.com'|'*'|g")
-    
-    # Remove the original catch-all proxy location (replaced with specific API routes + frontend)
-    CONFIG_CONTENT=$(echo "${CONFIG_CONTENT}" | sed '/^location \/bike-parking\/ {$/,/^}$/d')
-
-    # Add frontend serving and API proxy routes for local dev
-    CONFIG_CONTENT="${CONFIG_CONTENT}
-
-# --- Frontend (Local Development) ---
-# API routes proxy to the container
-location /bike-parking/current/ {
-    proxy_pass http://127.0.0.1:40501/current/;
-}
-location /bike-parking/history/ {
-    proxy_pass http://127.0.0.1:40501/history/;
-}
-# Everything else serves static frontend files
-location /bike-parking/ {
-    alias $(pwd)/app/frontend/;
-    index index.html;
-    try_files \$uri \$uri/ /bike-parking/index.html;
-}
-"
-fi
+# Local-only overrides are no longer needed now that domains are separated!
 
 echo "${CONFIG_CONTENT}" | $SUDO tee "${NGINX_APPS_DIR}/bike-parking" > /dev/null
 
@@ -112,5 +86,5 @@ docker compose up --build -d --remove-orphans
 
 echo "==> *** Deployment complete for ${ENV}! ***"
 if [ "${ENV}" == "local" ]; then
-    echo "Local Preview: http://localhost:8080/bike-parking/"
+    echo "Local Preview: https://kevingrazel.local/bike-parking/"
 fi

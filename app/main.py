@@ -25,9 +25,16 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
+@app.get("/")
+def base_api():
+    return {"APIs": [
+        "/current",
+        "/history",
+        # "/forecast"
+    ]}
+
 @app.get("/current")
 @app.get("/current/")
-@app.get("/")
 def get_current_availability(user_id: str = DEFAULT_USER_ID):
     conn = get_db_connection()
     try:

@@ -11,6 +11,19 @@ services:
         condition: service_completed_successfully
     command: ["fastapi", "run", "app/main.py", "--port", "${HISTORY_PORT}", "--host", "0.0.0.0"]
 
+  health:
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "${HEALTH_PORT}:${HEALTH_PORT}"
+    depends_on:
+      api:
+        condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: ["fastapi", "run", "app/health.py", "--port", "${HEALTH_PORT}", "--host", "0.0.0.0"]
+
   airflow-init:
     build: .
     env_file: .env
