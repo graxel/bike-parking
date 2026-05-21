@@ -20,7 +20,11 @@ app = FastAPI(title="Citi Bike Parking Tracker — Master API", lifespan=lifespa
 # CORS is handled by nginx in production, but allow it here for local dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://kevingrazel.com", "http://localhost:3000"],
+    allow_origins=[
+        "https://kevingrazel.com", 
+        "http://localhost:3000",
+        "https://kevingrazel.local"
+    ],
     allow_methods=["GET", "OPTIONS"],
     allow_headers=["Content-Type"],
 )

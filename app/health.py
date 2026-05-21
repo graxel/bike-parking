@@ -83,23 +83,34 @@ def get_airflow_dag_runs():
         conn = get_db_connection()
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                SELECT dag_id, state, execution_date, start_date, end_date
-                FROM airflow.dag_run
-                ORDER BY start_date DESC
-                LIMIT 10;
+                SELECT d.dag_id, dr.state, dr.execution_date, dr.start_date, dr.end_date
+                FROM (
+                    SELECT dag_id
+                    FROM airflow.dag
+                    WHERE is_paused = false
+                ) d
+                CROSS JOIN LATERAL (
+                    SELECT state, execution_date, start_date, end_date
+                    FROM airflow.dag_run
+                    WHERE dag_id = d.dag_id
+                    ORDER BY execution_date DESC
+                    LIMIT 10
+                ) dr
+                ORDER BY d.dag_id, dr.execution_date DESC;
             """)
             rows = cur.fetchall()
-            dag_runs = []
+            dag_runs_by_id: dict = {}
             for r in rows:
                 r_dict = dict(r)
+                dag_id = r_dict.pop("dag_id")
                 if r_dict.get("execution_date"):
                     r_dict["execution_date"] = r_dict["execution_date"].isoformat()
                 if r_dict.get("start_date"):
                     r_dict["start_date"] = r_dict["start_date"].isoformat()
                 if r_dict.get("end_date"):
                     r_dict["end_date"] = r_dict["end_date"].isoformat()
-                dag_runs.append(r_dict)
-            return {"recent_dag_runs": dag_runs}, "ok"
+                dag_runs_by_id.setdefault(dag_id, []).append(r_dict)
+            return {"dag_runs": dag_runs_by_id}, "ok"
     except Exception as e:
         return {"error": str(e)}, "degraded"
     finally:

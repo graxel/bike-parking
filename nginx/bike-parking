@@ -7,7 +7,6 @@
 
 location /bike-parking/ {
     proxy_pass http://127.0.0.1:40501/;
-    proxy_hide_header Access-Control-Allow-Origin;
 }
 
 # Health check (matches both with and without trailing slash)
