@@ -10,7 +10,10 @@ location /bike-parking/ {
     proxy_hide_header Access-Control-Allow-Origin;
 }
 
-# Health check
+# Health check (matches both with and without trailing slash)
+location = /bike-parking/health {
+    proxy_pass http://127.0.0.1:40500/;
+}
 location /bike-parking/health/ {
     proxy_pass http://127.0.0.1:40500/;
 }
