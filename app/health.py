@@ -87,7 +87,7 @@ def get_airflow_dag_runs():
                 FROM (
                     SELECT dag_id
                     FROM airflow.dag
-                    WHERE is_paused = false
+                    WHERE is_paused = false AND is_active = true
                 ) d
                 CROSS JOIN LATERAL (
                     SELECT state, execution_date, start_date, end_date
