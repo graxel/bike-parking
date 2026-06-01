@@ -28,5 +28,5 @@ with DAG(
     dbt_run_task = BashOperator(
         task_id='run_dbt_current_models',
         bash_command=f'cd {PROJECT_ROOT}/data_pipeline/dbt && exec {VENV_DBT} run --select tag:current --profiles-dir .',
-        execution_timeout=timedelta(minutes=2),
+        execution_timeout=timedelta(minutes=60),
     )
