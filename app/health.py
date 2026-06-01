@@ -5,7 +5,6 @@ import traceback
 import subprocess
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from psycopg2.extras import RealDictCursor
 from app.shared import get_db_connection
 
@@ -14,13 +13,6 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Citi Bike Parking Tracker — Health API", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET", "OPTIONS"],
-    allow_headers=["Content-Type"],
-)
 
 def check_endpoint(url: str):
     try:

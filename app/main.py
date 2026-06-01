@@ -2,7 +2,6 @@ import os
 import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from psycopg2.extras import RealDictCursor
 from app.shared import get_db_connection
 
@@ -16,18 +15,6 @@ async def lifespan(app: FastAPI):
     # Shutdown tasks if needed
 
 app = FastAPI(title="Citi Bike Parking Tracker — Master API", lifespan=lifespan)
-
-# CORS is handled by nginx in production, but allow it here for local dev
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://kevingrazel.com", 
-        "http://localhost:3000",
-        "https://kevingrazel.local"
-    ],
-    allow_methods=["GET", "OPTIONS"],
-    allow_headers=["Content-Type"],
-)
 
 @app.get("/")
 def base_api():
