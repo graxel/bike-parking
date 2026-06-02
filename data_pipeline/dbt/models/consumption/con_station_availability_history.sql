@@ -3,7 +3,7 @@
     unique_key=['station_id', 'reported_hour'],
     tags=['history'],
     post_hook=[
-        "DELETE FROM {{ this }} WHERE reported_hour >= date_trunc('day', NOW() - INTERVAL '8 days');"
+        "DELETE FROM {{ this }} WHERE reported_hour < date_trunc('day', NOW() - INTERVAL '8 days');"
     ]
 ) }}
 
