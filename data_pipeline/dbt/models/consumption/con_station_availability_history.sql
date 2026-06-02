@@ -1,7 +1,10 @@
 {{ config(
     materialized='incremental',
     unique_key=['station_id', 'reported_hour'],
-    tags=['history']
+    tags=['history'],
+    post_hook=[
+        "DELETE FROM {{ this }} WHERE reported_hour >= date_trunc('day', NOW() - INTERVAL '8 days');"
+    ]
 ) }}
 
 SELECT
@@ -22,7 +25,7 @@ FROM {{ ref('int_station_status') }}
     WHERE DATE_TRUNC('hour', reported_at) >= (
         SELECT GREATEST(
             MAX(reported_hour) - INTERVAL '2 hours',
-            date_trunc('hour', now() - interval '8 hours')
+            date_trunc('hour', now() - interval '8 days')
         )
         FROM {{ this }}
     )

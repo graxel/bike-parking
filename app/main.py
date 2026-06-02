@@ -84,6 +84,7 @@ def get_history_availability(user_id: str = DEFAULT_USER_ID):
                 JOIN app.station_group_stations sgs ON h.station_id = sgs.station_id
                 JOIN app.station_groups sg ON sgs.station_group_id = sg.id
                 WHERE sg.user_id = %s
+                  AND h.reported_hour >= date_trunc('day', NOW() - INTERVAL '8 days')
                 ORDER BY h.reported_hour ASC;
             """, (user_id,))
             rows = cur.fetchall()
