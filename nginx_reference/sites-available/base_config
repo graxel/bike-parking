@@ -1,0 +1,47 @@
+# HTTP => HTTPS redirect
+server {
+    listen 80;
+    server_name data.kevingrazel.com;
+    return 301 https://$host$request_uri;
+}
+
+# Main HTTPS server
+server {
+    listen 443 ssl;
+    server_name data.kevingrazel.com;
+
+    # SSL certs that Certbot installs
+    ssl_certificate /etc/letsencrypt/live/data.kevingrazel.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/data.kevingrazel.com/privkey.pem; # managed by Certbot
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Common proxy headers for proxied apps
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Host-wide CORS for requests coming from kevingrazel.com
+    add_header Access-Control-Allow-Origin $cors_allow_origin always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With" always;
+    add_header Access-Control-Expose-Headers "Content-Length, Content-Range" always;
+    add_header Vary "Origin" always;
+
+    # Serve static files at root
+    root /home/mrnopants;
+    index index.html;
+
+    # Root with OPTIONS preflight handling
+    location / {
+        if ($request_method = OPTIONS) {
+            return 204;
+        }
+
+        try_files $uri $uri/ =404;
+    }
+
+    # Include app-specific locations
+    include /etc/nginx/sites-enabled/apps/*;
+}
