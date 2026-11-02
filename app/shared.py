@@ -16,5 +16,6 @@ def get_db_connection():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
         dbname=os.getenv("DB_NAME"),
+        connect_timeout=5,
     )
     return conn
