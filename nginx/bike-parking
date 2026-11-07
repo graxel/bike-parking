@@ -7,6 +7,9 @@
 
 location /bike-parking/ {
     proxy_pass http://127.0.0.1:40501/;
+    # Stream large responses (map history chunks are ~1 MB) to the client instead of
+    # spilling them to nginx's temp dir, so they never depend on its permissions
+    proxy_max_temp_file_size 0;
 }
 
 # Health check (matches both with and without trailing slash)

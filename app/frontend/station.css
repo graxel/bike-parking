@@ -1,0 +1,74 @@
+.sp { max-width: 1100px; }
+
+.sp-nav { display: flex; justify-content: space-between; margin-bottom: 1.25rem; }
+.sp-nav a { color: var(--accent-color); text-decoration: none; font-weight: 600; }
+.sp-nav a:hover { text-decoration: underline; }
+
+.sp-card {
+    background: var(--surface-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+.sp-title { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
+.sp-title h1 { font-size: 1.75rem; margin: 0; }
+.sp-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid #94a3b8;
+    flex-shrink: 0;
+    background: #64748b;
+}
+
+.sp-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+.sp-metric-label { display: block; color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.sp-metric { font-size: 1.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sp-metric-small { font-size: 1.1rem; font-weight: 600; }
+
+.sp-uuid {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--surface-border);
+    color: var(--text-secondary);
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 8px;
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sp-uuid:hover { color: var(--text-primary); border-color: var(--accent-color); }
+
+.sp-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.sp-chart-head h2 { font-size: 1.1rem; margin: 0; }
+.sp-ranges { display: flex; gap: 0.4rem; }
+.sp-ranges button {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--surface-border);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 0.35rem 0.8rem;
+    font: 600 0.85rem var(--font-main);
+    cursor: pointer;
+}
+.sp-ranges button.active { background: var(--accent-color); color: #0f172a; border-color: var(--accent-color); }
+
+.sp-chart { position: relative; height: 420px; }
+.sp-note { color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.75rem; min-height: 1em; }
+
+@media (max-width: 640px) {
+    body { padding: 1rem; }
+    .sp-card { padding: 1rem; }
+    .sp-title h1 { font-size: 1.3rem; }
+    .sp-chart { height: 300px; }
+}

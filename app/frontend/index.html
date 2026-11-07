@@ -4,30 +4,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Citi Bike Tracker</title>
+    <title>Citi Bike Map</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="map.css">
 </head>
 
 <body>
-    <div class="app-container">
-        <header class="glass-header">
-            <div class="header-logo">🚲</div>
-            <h1>Citi Bike Parking</h1>
-            <p class="subtitle">8-Day History + Forecast</p>
-            <br>
-            <a href="map.html"
-                style="display: inline-flex; align-items: center; gap: 0.5rem; color: var(--text-primary); text-decoration: none; background: rgba(0,0,0,0.2); padding: 0.75rem 1.25rem; border-radius: 8px; border: 1px solid var(--surface-border); transition: 0.2s;">🗺️
-                Find Station UUID Map</a>
-        </header>
+    <div id="map"></div>
 
-        <main id="dashboard" class="dashboard-grid">
-            <div class="loader" id="loader">Fetching live station data and models...</div>
-        </main>
+    <header class="panel map-title">
+        <span class="map-logo">🚲</span>
+        <h1>Citi Bike Parking</h1>
+        <a id="dashboard-link" class="panel-link" href="dashboard.html">My stations →</a>
+    </header>
+
+    <div class="panel legend">
+        <div class="layer-toggles">
+            <label><input type="checkbox" id="toggle-stations" checked> Stations</label>
+            <label><input type="checkbox" id="toggle-cells" checked> Areas</label>
+        </div>
+        <details id="legend-details" open>
+            <summary>Legend</summary>
+            <ul id="legend-items"></ul>
+        </details>
     </div>
-    <script src="app.js"></script>
+
+    <div class="panel timeline">
+        <button id="play-btn" class="tl-btn" title="Play / pause (space)" aria-label="Play">▶</button>
+        <button id="speed-btn" class="tl-btn tl-speed" title="Playback speed">1×</button>
+        <div class="tl-main">
+            <div class="tl-label"><span id="time-label">Loading…</span><span id="loading-label" class="tl-loading"></span></div>
+            <div id="tape" class="tl-tape" tabindex="0" role="slider" aria-label="Time">
+                <canvas></canvas>
+                <div class="tl-playhead"></div>
+            </div>
+        </div>
+        <button id="now-btn" class="tl-btn tl-now" title="Jump to live data">Now</button>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6.0.4/dist/d3-delaunay.min.js"></script>
+    <script src="common.js"></script>
+    <script src="cells.js"></script>
+    <script src="tape.js"></script>
+    <script src="map.js"></script>
 </body>
 
 </html>

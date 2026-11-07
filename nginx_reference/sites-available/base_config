@@ -29,17 +29,14 @@ server {
     add_header Access-Control-Expose-Headers "Content-Length, Content-Range" always;
     add_header Vary "Origin" always;
 
-    # Serve static files at root
-    root /home/mrnopants;
-    index index.html;
-
-    # Root with OPTIONS preflight handling
+    # Anything that isn't an app below is "not found". Don't set a `root` here:
+    # this server is public, and a root would expose that directory's files.
     location / {
         if ($request_method = OPTIONS) {
             return 204;
         }
 
-        try_files $uri $uri/ =404;
+        return 404;
     }
 
     # Include app-specific locations
