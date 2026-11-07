@@ -2,6 +2,7 @@ services:
 
   api:
     build: .
+    image: bike-parking:latest
     env_file: .env
     restart: unless-stopped
     ports:
@@ -12,7 +13,7 @@ services:
     command: ["fastapi", "run", "app/main.py", "--port", "${HISTORY_PORT}", "--host", "0.0.0.0"]
 
   health:
-    build: .
+    image: bike-parking:latest
     env_file: .env
     restart: unless-stopped
     ports:
@@ -25,7 +26,7 @@ services:
     command: ["fastapi", "run", "app/health.py", "--port", "${HEALTH_PORT}", "--host", "0.0.0.0"]
 
   airflow-init:
-    build: .
+    image: bike-parking:latest
     env_file: .env
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public&connect_timeout=5
@@ -51,7 +52,7 @@ services:
         python3 data_pipeline/init_airflow_db.py
 
   airflow-webserver:
-    build: .
+    image: bike-parking:latest
     env_file: .env
     restart: unless-stopped
     ports:
@@ -74,7 +75,7 @@ services:
     command: ["airflow", "webserver", "--port", "${AIRFLOW_WEBSERVER_PORT}"]
 
   airflow-scheduler:
-    build: .
+    image: bike-parking:latest
     hostname: airflow-scheduler
     env_file: .env
     restart: unless-stopped
