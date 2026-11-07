@@ -30,7 +30,6 @@ services:
     env_file: .env
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public&connect_timeout=5
-      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow&connect_timeout=5
       - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=5
       - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=5
       - AIRFLOW__WEBSERVER__WORKERS=2
@@ -59,7 +58,6 @@ services:
       - "${AIRFLOW_WEBSERVER_PORT}:${AIRFLOW_WEBSERVER_PORT}"
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public&connect_timeout=5
-      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow&connect_timeout=5
       - AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True
       - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=5
       - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=5
@@ -81,7 +79,6 @@ services:
     restart: unless-stopped
     environment:
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dairflow,public&connect_timeout=5
-      - MLFLOW_BACKEND_STORE_URI=postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-csearch_path%3Dmlflow&connect_timeout=5
       - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_SIZE=5
       - AIRFLOW__DATABASE__SQL_ALCHEMY_MAX_OVERFLOW=5
     volumes:

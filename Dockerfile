@@ -23,7 +23,7 @@ WORKDIR /bike-parking
 COPY pyproject.toml uv.lock ./
 # We use a BuildKit cache mount for uv to instantly reuse downloaded Python packages
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project
+    uv sync --frozen --no-install-project --no-dev
 
 # 5. Application Code (Runs every push, but it's just a file copy - fast!)
 COPY . .
