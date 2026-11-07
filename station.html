@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citi Bike Station</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="station.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container sp">
+        <nav class="sp-nav">
+            <a id="map-link" href="./">← Map</a>
+            <a id="dashboard-link" href="dashboard.html">My stations</a>
+        </nav>
+
+        <section class="sp-card">
+            <div class="sp-title">
+                <span id="status-swatch" class="sp-swatch"></span>
+                <h1 id="station-name">Loading…</h1>
+            </div>
+            <div class="sp-metrics">
+                <div><span class="sp-metric-label">Bikes</span><span id="m-bikes" class="sp-metric">–</span></div>
+                <div><span class="sp-metric-label">Docks</span><span id="m-docks" class="sp-metric">–</span></div>
+                <div><span class="sp-metric-label">Capacity</span><span id="m-capacity" class="sp-metric">–</span></div>
+                <div><span class="sp-metric-label">Updated</span><span id="m-updated" class="sp-metric sp-metric-small">–</span></div>
+            </div>
+            <button id="copy-id" class="sp-uuid" title="Copy station UUID (for groups.yaml)"></button>
+        </section>
+
+        <section class="sp-card">
+            <div class="sp-chart-head">
+                <h2>Bikes available</h2>
+                <div class="sp-ranges" id="ranges">
+                    <button data-days="1">24h</button>
+                    <button data-days="3">3d</button>
+                    <button data-days="8" class="active">8d</button>
+                </div>
+            </div>
+            <div class="sp-chart"><canvas id="chart"></canvas></div>
+            <p id="chart-note" class="sp-note"></p>
+        </section>
+    </div>
+
+    <script src="common.js"></script>
+    <script src="station.js"></script>
+</body>
+
+</html>

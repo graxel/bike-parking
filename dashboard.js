@@ -1,0 +1,842 @@
+document.addEventListener("DOMContentLoaded", async () => {
+    const dashboard = document.getElementById("dashboard");
+
+    try {
+        const [currentRes, historyRes] = await Promise.all([
+            fetch(`${API_BASE}/current/`),
+            fetch(`${API_BASE}/history/`)
+        ]);
+
+        if (!currentRes.ok) {
+            const text = await currentRes.text();
+            throw new Error(`API /current/ failed: ${currentRes.status} ${currentRes.statusText} - ${text.slice(0, 200)}`);
+        }
+        if (!historyRes.ok) {
+            const text = await historyRes.text();
+            throw new Error(`API /history/ failed: ${historyRes.status} ${historyRes.statusText} - ${text.slice(0, 200)}`);
+        }
+
+        const currentData = await currentRes.json();
+        const historyData = await historyRes.json();
+
+        renderDashboard(currentData.data, historyData.data, dashboard);
+    } catch (err) {
+        console.error("Error fetching station data:", err);
+        dashboard.innerHTML = `<div class="loader" style="color:#ef4444; width:100%; text-align: left; padding: 20px;"><h2 style="color:white; margin-bottom:10px;">Javascript UI Crash</h2><b style="font-size:16px;">${err.message}</b><br><br><pre style="white-space: pre-wrap; font-size:13px; color:#94a3b8; background:rgba(0,0,0,0.5); padding:15px; border-radius:8px;">${err.stack}</pre></div>`;
+    }
+});
+
+function renderDashboard(currentGroups, historyGroups, container) {
+    container.innerHTML = "";
+    let delay = 0;
+
+    if (currentGroups.length === 0) {
+        container.innerHTML = `<div class="loader" style="animation:none;">No station groups configured in YAML. Update groups.yaml.</div>`;
+        return;
+    }
+
+    currentGroups.forEach((group) => {
+        const hGroup = historyGroups.find(g => g.name === group.name);
+
+        const card = document.createElement("div");
+        card.className = "group-card";
+        card.style.animationDelay = `${delay}s`;
+        delay += 0.15;
+
+        // Aggregate Current Stats
+        let totalBikes = 0;
+        let totalDocks = 0;
+        let totalCapacity = 0;
+        let stationsHtml = '<div class="station-list" style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-secondary); border-top: 1px solid var(--surface-border); padding-top: 1rem;">';
+
+        group.stations.forEach(station => {
+            totalBikes += (station.num_bikes_available || 0);
+            totalDocks += (station.num_docks_available || 0);
+            totalCapacity += (station.capacity || 0);
+            const stationSpanId = `station-${station.station_id}-val-${group.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+
+            const safeDocks = Math.round(station.num_docks_available || 0);
+            const paddedDocks = (safeDocks >= 0 && safeDocks < 10) ? `<span style="visibility: hidden;">0</span>${safeDocks}` : `${safeDocks}`;
+
+            stationsHtml += `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem; align-items:center;">
+                    <span style="color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 50%;">${station.station_name || 'Station ' + station.station_id}</span>
+                    <span id="${stationSpanId}" style="text-align: right; min-width: 150px; font-variant-numeric: tabular-nums;">
+                        <span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">docks: ${paddedDocks}</span>
+                    </span>
+                </div>
+            `;
+        });
+        stationsHtml += '</div>';
+
+        // Aggregate History Stats (Docks) for the Group Plot
+        const groupHistoryMap = {};
+        if (hGroup && hGroup.stations) {
+            Object.values(hGroup.stations).forEach(hStations => {
+                if (hStations && Array.isArray(hStations)) {
+                    hStations.forEach(h => {
+                        // DB returns bucketed dates: YYYY-MM-DDTHH:MM:SS
+                        const tsHour = h.reported_hour ? h.reported_hour : null;
+                        if (tsHour) {
+                            if (!groupHistoryMap[tsHour]) {
+                                groupHistoryMap[tsHour] = { min: 0, avg: 0, max: 0 };
+                            }
+                            groupHistoryMap[tsHour].min += (h.min_docks_available || 0);
+                            groupHistoryMap[tsHour].avg += (h.avg_docks_available || 0);
+                            groupHistoryMap[tsHour].max += (h.max_docks_available || 0);
+                        }
+                    });
+                }
+            });
+        }
+
+        const aggregatedHistory = Object.keys(groupHistoryMap).map(ts => ({
+            reported_hour: ts,
+            min_docks_available: groupHistoryMap[ts].min,
+            avg_docks_available: groupHistoryMap[ts].avg,
+            max_docks_available: groupHistoryMap[ts].max
+        }));
+
+        const canvasId = `chart-group-${group.name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+        const hudId = `hud-${canvasId}`;
+        const groupSlug = group.name.replace(/[^a-zA-Z0-9]/g, '-');
+        const dateAreaId = `date-area-${groupSlug}`;
+
+        const padToTwo = (num) => {
+            const val = Math.round(num);
+            return (val >= 0 && val < 10) ? `<span style="visibility: hidden;">0</span>${val}` : `${val}`;
+        };
+
+        const defaultHudText = `
+            <div style="display: grid; grid-template-columns: auto auto; gap: 0.15rem 0.5rem; align-items: center; justify-content: end;">
+                <div style="font-size: 0.95rem;">&nbsp;</div>
+                <div style="font-size: 0.95rem;">&nbsp;</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Docks:</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${padToTwo(totalDocks)}</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Bikes:</div>
+                <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${padToTwo(totalBikes)}</div>
+            </div>
+        `;
+
+        const overviewCanvasId = `overview-${canvasId}`;
+
+        card.innerHTML = `
+            <div class="group-header" style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: none; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: nowrap; gap: 10px;">
+                <div style="display: flex; flex-direction: column;">
+                    <h2 class="group-title" style="margin-bottom: 0.25rem;">${group.name}</h2>
+                    <div id="${dateAreaId}" style="visibility: hidden; color: var(--text-secondary); font-size: 0.95rem; line-height: 1.3;">
+                        <div style="margin-top: 0.2rem;">Day</div>
+                        <div>Time</div>
+                    </div>
+                </div>
+                <div id="${hudId}" style="display: flex; align-items: flex-start; justify-content: flex-end;">${defaultHudText}</div>
+            </div>
+            <div class="chart-container" style="height: 265px; margin-bottom: 0.25rem;">
+                <canvas id="${canvasId}"></canvas>
+            </div>
+            <div id="overview-wrapper-${groupSlug}" class="chart-container" style="height: 60px; margin-bottom: 1rem; display: none;">
+                <canvas id="${overviewCanvasId}"></canvas>
+            </div>
+            ${stationsHtml}
+        `;
+
+        container.appendChild(card);
+
+        if (aggregatedHistory.length > 0) {
+            renderChart(canvasId, hudId, defaultHudText, aggregatedHistory, totalCapacity, totalDocks, totalBikes, group.stations, hGroup ? hGroup.stations : {}, groupSlug);
+        }
+    });
+}
+
+function renderChart(canvasId, hudId, defaultHudText, historyData, totalCapacity, totalDocks, totalBikes, groupStations, historyStations, groupSlug) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const ctx = el.getContext("2d");
+
+    const now = new Date();
+
+    // Sort chronologically
+    historyData.sort((a, b) => new Date(a.reported_hour) - new Date(b.reported_hour));
+
+    // Calculate expected interval dynamically without any magic multipliers.
+    // Since SQL uses DATE_TRUNC, consecutive buckets will have exactly 'minInterval' diff.
+    let minInterval = Infinity;
+    for (let i = 1; i < historyData.length; i++) {
+        const diff = new Date(historyData[i].reported_hour) - new Date(historyData[i - 1].reported_hour);
+        if (diff > 0 && diff < minInterval) minInterval = diff;
+    }
+
+    // Calculate the dynamic daily midpoint index to consistently center the x-axis text label
+    const dayIndexGroups = {};
+    historyData.forEach((d, i) => {
+        const dateStr = new Date(d.reported_hour).toLocaleDateString();
+        if (!dayIndexGroups[dateStr]) {
+            dayIndexGroups[dateStr] = [];
+        }
+        dayIndexGroups[dateStr].push(i);
+    });
+
+    const midpointIndices = new Set();
+    Object.values(dayIndexGroups).forEach(indices => {
+        // Floor division gets the exact center index of the available contiguous hours for that date
+        const mid = indices[Math.floor(indices.length / 2)];
+        midpointIndices.add(mid);
+    });
+
+    // Use local time for chart bounds because the chartjs-adapter-date-fns generates
+    // ticks in local time. Data timestamps (UTC ISO strings) are correctly converted
+    // to epoch ms by Date.parse(), so they align with local Date boundaries.
+    const chartMin = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+    const chartMax = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() < 12 ? 0 : 1), 23, 59, 59, 999);
+
+    // Focus-plus-context: on mobile, the detail chart shows a window sized
+    // by a fixed pixels-per-hour ratio so bar density is consistent across
+    // devices. The full 8-day plot is FULL_PLOT_PX wide; the viewport shows
+    // whatever fraction of that fits on the screen.
+    const isMobile = window.innerWidth <= 768;
+    const FULL_RANGE_MS = chartMax.getTime() - chartMin.getTime();
+    const FULL_PLOT_PX = 1600; // fixed pixel width for the full 8-day plot
+    const viewportPx = el.parentElement ? el.parentElement.clientWidth : window.innerWidth;
+    const DETAIL_WINDOW_MS = Math.min(FULL_RANGE_MS, (viewportPx / FULL_PLOT_PX) * FULL_RANGE_MS);
+
+    let dMin = chartMax.getTime() - DETAIL_WINDOW_MS;
+    let dMax = chartMax.getTime();
+
+    // On smaller screens where we aren't showing the full range, 
+    // ensure 'now' is at least at the center of the plot.
+    if (DETAIL_WINDOW_MS < FULL_RANGE_MS) {
+        const centerTime = dMin + DETAIL_WINDOW_MS / 2;
+        if (now.getTime() < centerTime) {
+            dMin = now.getTime() - DETAIL_WINDOW_MS / 2;
+            dMax = dMin + DETAIL_WINDOW_MS;
+        }
+
+        // Clamp to global bounds
+        if (dMin < chartMin.getTime()) {
+            dMin = chartMin.getTime();
+            dMax = dMin + DETAIL_WINDOW_MS;
+        }
+        if (dMax > chartMax.getTime()) {
+            dMax = chartMax.getTime();
+            dMin = dMax - DETAIL_WINDOW_MS;
+        }
+    }
+
+    const detailState = { min: dMin, max: dMax };
+
+    // Pre-compute bar data for the full dataset (used by overview chart)
+    const allHighLowBars = historyData.map((d) => ({
+        x: new Date(d.reported_hour).getTime() + 30 * 60 * 1000,
+        y: [d.min_docks_available || 0, d.max_docks_available || 0]
+    }));
+
+    // Compute a global y-max from ALL data so the y-axis doesn't jitter
+    // when the detail window pans across different peaks.
+    const globalYMax = Math.max(...historyData.map(d => d.max_docks_available || 0));
+
+    // For the detail chart, filter to only bars within the visible range.
+    // This function is called on every pan to re-filter.
+    const getVisibleBars = () => allHighLowBars.filter(
+        b => b.x >= detailState.min && b.x <= detailState.max
+    );
+    let highLowBars = getVisibleBars();
+
+    const midnightGridLinesPlugin = {
+        id: 'midnightGridLines',
+        beforeDraw: (chart) => {
+            const ctx = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+
+            ctx.save();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
+            ctx.lineWidth = 1;
+
+            let currentDay = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate() + 1);
+
+            while (currentDay <= chartMax) {
+                const x = xAxis.getPixelForValue(currentDay.getTime());
+
+                // Only draw if within chart area visually
+                if (x >= xAxis.left && x <= xAxis.right) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, yAxis.top);
+                    ctx.lineTo(x, yAxis.bottom + 40);
+                    ctx.stroke();
+                }
+                currentDay = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate() + 1);
+            }
+            ctx.restore();
+        }
+    };
+
+    // Pre-build lookup maps keyed by bar x-timestamp (epoch ms with 30-min offset).
+    // This decouples plugins and the tooltip from the historyData array index, which
+    // matters on mobile where the detail chart's dataset is a filtered subset.
+    const avgByTimestamp = {};
+    const historyByTimestamp = {};
+    historyData.forEach(d => {
+        const ts = new Date(d.reported_hour).getTime() + 30 * 60 * 1000; // match bar x offset
+        avgByTimestamp[ts] = d.avg_docks_available || 0;
+        historyByTimestamp[ts] = d;
+    });
+
+    const averageLinesPlugin = {
+        id: 'averageLines',
+        afterDatasetsDraw: (chart) => {
+            const ctx = chart.ctx;
+            const yAxis = chart.scales.y;
+            const meta = chart.getDatasetMeta(0); // High-Low Bars dataset
+
+            if (!meta || meta.hidden) return;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(chart.chartArea.left, chart.chartArea.top, chart.chartArea.width, chart.chartArea.height);
+            ctx.clip();
+
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(56, 189, 248, 1)"; // Same as box border blue
+            ctx.lineWidth = 1.5; // 1.5x the weight of the box border
+
+            const dataset = chart.data.datasets[0].data;
+            let isFirst = true;
+
+            dataset.forEach((barData, index) => {
+                const avg = avgByTimestamp[barData.x];
+                if (avg === undefined) return;
+
+                const element = meta.data[index];
+
+                if (element && !element.hidden) {
+                    const y = yAxis.getPixelForValue(avg);
+                    const left = element.x - (element.width / 2);
+                    const right = element.x + (element.width / 2);
+
+                    // Gap detection: If the time between points is strictly greater than our expected bucket interval...
+                    if (index > 0) {
+                        const prevX = dataset[index - 1].x;
+                        if (barData.x - prevX > minInterval) {
+                            isFirst = true; // Break the average line to avoid bridging missing data
+                        }
+                    }
+
+                    if (isFirst) {
+                        ctx.moveTo(left, y);
+                        isFirst = false;
+                    } else {
+                        ctx.lineTo(left, y);
+                    }
+                    ctx.lineTo(right, y);
+                }
+            });
+
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+
+    const xAxisLabelsPlugin = {
+        id: 'xAxisLabels',
+        afterDraw: (chart) => {
+            const ctx = chart.ctx;
+            const xAxis = chart.scales.x;
+            const yAxis = chart.scales.y;
+            const meta = chart.getDatasetMeta(0);
+
+            if (!meta || meta.hidden) return;
+
+            ctx.save();
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "bold 11px Inter";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "top";
+
+            // Loop through each local day visible in the current chart viewport
+            const scaleMin = new Date(xAxis.min);
+            const scaleMax = new Date(xAxis.max);
+            let currentDay = new Date(scaleMin.getFullYear(), scaleMin.getMonth(), scaleMin.getDate());
+            while (currentDay <= scaleMax) {
+                const dayStart = Math.max(currentDay.getTime(), scaleMin.getTime());
+                const nextDay = new Date(currentDay.getFullYear(), currentDay.getMonth(), currentDay.getDate() + 1);
+
+                const dayEnd = Math.min(nextDay.getTime() - 1, scaleMax.getTime());
+
+                // Find pixel positions
+                const xStart = xAxis.getPixelForValue(dayStart);
+                const xEnd = xAxis.getPixelForValue(dayEnd);
+                const centerPixel = (xStart + xEnd) / 2;
+
+                const dayStr = currentDay.toLocaleDateString([], { weekday: 'short' });
+                const dateStr = `${currentDay.getMonth() + 1}/${currentDay.getDate()}`;
+
+                ctx.fillText(dayStr, centerPixel, yAxis.bottom + 10);
+                ctx.fillText(dateStr, centerPixel, yAxis.bottom + 24);
+
+                // Advance to next day
+                currentDay = nextDay;
+            }
+
+            ctx.restore();
+        }
+    };
+
+    const hoverHighlightPlugin = {
+        id: 'hoverHighlight',
+        beforeDatasetsDraw: (chart) => {
+            if (typeof chart.getActiveElements !== 'function') return;
+            const activeElements = chart.getActiveElements();
+            if (activeElements.length > 0) {
+                const activePoint = activeElements[0];
+                const ctx = chart.ctx;
+                const meta = chart.getDatasetMeta(activePoint.datasetIndex);
+                if (!meta || meta.hidden) return;
+
+                const element = meta.data[activePoint.index];
+                if (element) {
+                    ctx.save();
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+                    const left = element.x - (element.width / 2);
+                    const top = chart.chartArea.top;
+                    const bottom = chart.chartArea.bottom;
+                    ctx.fillRect(left, top, element.width, bottom - top);
+                    ctx.restore();
+                }
+            }
+        }
+    };
+
+    const chart = new Chart(ctx, {
+        type: "bar", // "Flying bricks" as vertical bars
+        plugins: [midnightGridLinesPlugin, averageLinesPlugin, xAxisLabelsPlugin, hoverHighlightPlugin],
+        data: {
+            datasets: [
+                {
+                    label: "High–Low Range",
+                    type: "bar",
+                    data: highLowBars,
+                    borderColor: "transparent",
+                    backgroundColor: "#1b4968",
+                    borderWidth: 0,
+                    borderSkipped: false,
+                    // By setting categoryPercentage and barPercentage to 1.0, 
+                    // the bar takes up 100% of the available space for its tick interval.
+                    // If the interval is 1 hour, the bar will be exactly 1 hour wide.
+                    categoryPercentage: 1.0,
+                    barPercentage: 1.0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { bottom: 40, left: 0, right: 0 } },
+            plugins: {
+                legend: {
+                    display: false // Dropped the legend natively
+                },
+                tooltip: {
+                    enabled: false, // Suppresses native tooltip rendering
+                    mode: "index",
+                    intersect: false,
+                    external: function (context) {
+                        // This function handles the custom HTML tooltip / HUD updates.
+                        // It reads the raw data from `historyData` corresponding to the hovered bar.
+                        const tooltipModel = context.tooltip;
+                        const hudEl = document.getElementById(hudId);
+                        const dateAreaEl = document.getElementById(`date-area-${groupSlug}`);
+
+                        if (!hudEl) return;
+
+                        // If mouse leaves chart, restore the live 'Now' default stats
+                        if (tooltipModel.opacity === 0) {
+                            hudEl.innerHTML = defaultHudText;
+
+                            if (dateAreaEl) {
+                                dateAreaEl.style.visibility = "hidden";
+                            }
+
+                            // Restore individual stations
+                            groupStations.forEach(s => {
+                                const sId = `station-${s.station_id}-val-${groupSlug}`;
+                                const el = document.getElementById(sId);
+                                if (el) {
+                                    const safeDocks = Math.round(s.num_docks_available || 0);
+                                    const paddedDocks = (safeDocks >= 0 && safeDocks < 10) ? `<span style="visibility: hidden;">0</span>${safeDocks}` : `${safeDocks}`;
+                                    el.innerHTML = `<span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">docks: ${paddedDocks}</span>`;
+                                }
+                            });
+                            return;
+                        }
+
+                        // If hovering a block, inject the bounds dynamically into the metrics and HUD
+                        if (tooltipModel.body) {
+                            const dataIndex = tooltipModel.dataPoints[0].dataIndex;
+                            const barEntry = context.chart.data.datasets[0].data[dataIndex];
+                            const d = historyByTimestamp[barEntry.x];
+                            if (!d) return;
+                            const hoverHour = d.reported_hour;
+
+                            // We read the original reported_hour string from the database (e.g., "2026-04-13T18:00:00+00:00")
+                            // and parse it into a JavaScript Date object.
+                            const start = new Date(d.reported_hour);
+                            // We define the end of the interval as 1 hour (60 * 60 * 1000 ms) after the start.
+                            const end = new Date(start.getTime() + 60 * 60 * 1000);
+                            const day = start.toLocaleDateString([], { weekday: 'long' });
+                            const startStr = start.toLocaleTimeString([], { hour: 'numeric' }).toLowerCase();
+                            const endStr = end.toLocaleTimeString([], { hour: 'numeric' }).toLowerCase();
+
+                            const formatVal = (val) => {
+                                const num = parseFloat(val);
+                                let fixedStr = num.toFixed(1);
+
+                                if (num >= 0 && num < 10) {
+                                    fixedStr = `<span style="visibility: hidden;">0</span>${fixedStr}`;
+                                }
+
+                                if (fixedStr.endsWith('.0')) {
+                                    return `${fixedStr.slice(0, -2)}<span style="visibility: hidden;">.0</span>`;
+                                }
+                                return fixedStr;
+                            };
+
+                            const max = formatVal(d.max_docks_available || 0);
+                            const avg = formatVal(d.avg_docks_available || 0);
+                            const min = formatVal(d.min_docks_available || 0);
+
+                            // Set HUD to active min/avg/max
+                            hudEl.innerHTML = `
+                                <div style="display: grid; grid-template-columns: auto auto; gap: 0.15rem 0.5rem; align-items: center; justify-content: end;">
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Max Docks:</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${max}</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Avg Docks:</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${avg}</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right;">Min Docks:</div>
+                                    <div style="color: var(--success-color); font-weight: 600; font-size: 1.0rem; text-align: right; font-variant-numeric: tabular-nums;">${min}</div>
+                                </div>
+                            `;
+
+                            if (dateAreaEl) {
+                                dateAreaEl.innerHTML = `
+                                    <div style="margin-top: 0.2rem;">${day}</div>
+                                    <div>${startStr} - ${endStr}</div>
+                                `;
+                                dateAreaEl.style.visibility = "visible";
+                            }
+
+                            // Update individual stations with avg
+                            groupStations.forEach(s => {
+                                const sId = `station-${s.station_id}-val-${groupSlug}`;
+                                const el = document.getElementById(sId);
+                                if (el) {
+                                    const sHistory = historyStations[s.station_id] || [];
+                                    const hEntry = sHistory.find(h => h.reported_hour === hoverHour);
+                                    if (hEntry) {
+                                        const hAvg = formatVal(hEntry.avg_docks_available || 0);
+                                        el.innerHTML = `<span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">avg docks: ${hAvg}</span>`;
+                                    } else {
+                                        el.innerHTML = `<span style="color: var(--text-secondary); font-size: 0.9rem;">no data</span>`;
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    // The 'time' scale instructs Chart.js to treat the x-axis as a continuous timeline.
+                    // It maps the 'x' epoch ms values from our dataset exactly to their physical position on the axis.
+                    type: 'time',
+                    min: detailState.min,
+                    max: detailState.max,
+                    time: {
+                        unit: 'hour',
+                        displayFormats: {
+                            hour: 'HH:mm'
+                        }
+                    },
+                    display: true,
+                    grid: {
+                        drawBorder: false,
+                        drawTicks: false,
+                        drawOnChartArea: true,
+                        color: "transparent"
+                    },
+                    offset: false,
+                    ticks: {
+                        display: false
+                    }
+                },
+                y: {
+                    display: true,
+                    min: 0,
+                    max: globalYMax > 0 ? Math.ceil(globalYMax * 1.1) : undefined,
+                    grid: {
+                        color: function (context) {
+                            if (context.tick.value === 0) return "rgba(255, 255, 255, 0.4)";
+                            return "rgba(255, 255, 255, 0.05)";
+                        },
+                        drawBorder: false,
+                        borderDash: function (context) {
+                            if (context.tick.value === 0) return [];
+                            return [5, 5];
+                        }
+                    },
+                    ticks: {
+                        color: "#94a3b8",
+                        font: { size: 10, family: "Inter" },
+                        maxTicksLimit: 5,
+                        padding: 10
+                    },
+                    afterFit: function (axis) {
+                        axis.width = 40; // Fixed width to ensure alignment with overview chart
+                    }
+                }
+            },
+            interaction: {
+                mode: "nearest",
+                axis: "x",
+                intersect: false
+            }
+        }
+    });
+
+    // On mobile, tapping the chart triggers the hover state. 
+    // We want the hover state to immediately clear when the user lifts their finger.
+    const clearHoverState = (e) => {
+        // Prevent the browser from firing synthetic mousemove/click events
+        // immediately after the touchend, which would re-trigger the chart hover.
+        if (e && e.cancelable && e.type.startsWith('touch')) {
+            e.preventDefault();
+        }
+
+        // Delay the clear slightly so any pending Chart.js animation frames 
+        // (from a late touchmove) are processed first, ensuring our clear isn't overwritten.
+        setTimeout(() => {
+            // Clear Chart.js internal state
+            chart.setActiveElements([]);
+            chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+            chart.update();
+
+            // Force an immediate synchronous reset of the HUD and UI elements
+            // bypassing any async Chart.js render queues.
+            const hudEl = document.getElementById(hudId);
+            if (hudEl) hudEl.innerHTML = defaultHudText;
+
+            const dateAreaEl = document.getElementById(`date-area-${groupSlug}`);
+            if (dateAreaEl) dateAreaEl.style.visibility = "hidden";
+
+            groupStations.forEach(s => {
+                const sId = `station-${s.station_id}-val-${groupSlug}`;
+                const elId = document.getElementById(sId);
+                if (elId) {
+                    const safeDocks = Math.round(s.num_docks_available || 0);
+                    const paddedDocks = (safeDocks >= 0 && safeDocks < 10) ? `<span style="visibility: hidden;">0</span>${safeDocks}` : `${safeDocks}`;
+                    elId.innerHTML = `<span style="background: rgba(16, 185, 129, 0.2); color: var(--success-color); padding: 0.2rem 0.6rem; border-radius: 4px; font-weight:600;">docks: ${paddedDocks}</span>`;
+                }
+            });
+        }, 50);
+    };
+
+    // { passive: false } is required so we can call e.preventDefault()
+    el.addEventListener('touchend', clearHoverState, { passive: false });
+    el.addEventListener('touchcancel', clearHoverState, { passive: false });
+    el.addEventListener('mouseleave', clearHoverState);
+
+    // ── Focus-plus-context: Overview chart with brush ──
+    // Show overview whenever the viewport is smaller than the full data range
+    if (DETAIL_WINDOW_MS >= FULL_RANGE_MS) {
+        const overviewWrapper = document.getElementById(`overview-wrapper-${groupSlug}`);
+        if (overviewWrapper) overviewWrapper.style.display = 'none';
+        return;
+    }
+
+    const overviewCanvasId = `overview-${canvasId}`;
+    const overviewWrapper = document.getElementById(`overview-wrapper-${groupSlug}`);
+    const overviewEl = document.getElementById(overviewCanvasId);
+    if (!overviewWrapper || !overviewEl) return;
+
+    overviewWrapper.style.display = 'block';
+    const overviewCtx = overviewEl.getContext('2d');
+
+    // Brush plugin: draws the selection window and dimmed regions on the overview chart
+    const brushPlugin = {
+        id: 'brushOverlay',
+        afterDatasetsDraw: (ovChart) => {
+            const ctx = ovChart.ctx;
+            const xAxis = ovChart.scales.x;
+            const area = ovChart.chartArea;
+
+            const leftPx = xAxis.getPixelForValue(detailState.min);
+            const rightPx = xAxis.getPixelForValue(detailState.max);
+
+            ctx.save();
+
+            // Dim the regions outside the brush window
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.fillRect(area.left, area.top, leftPx - area.left, area.bottom - area.top);
+            ctx.fillRect(rightPx, area.top, area.right - rightPx, area.bottom - area.top);
+
+            // Draw brush window border
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(leftPx, area.top, rightPx - leftPx, area.bottom - area.top);
+
+            ctx.restore();
+        }
+    };
+
+    // Overview x-axis labels plugin (day abbreviations centered in each day)
+    const overviewLabelsPlugin = {
+        id: 'overviewLabels',
+        afterDraw: (ovChart) => {
+            const ctx = ovChart.ctx;
+            const xAxis = ovChart.scales.x;
+            const yAxis = ovChart.scales.y;
+
+            ctx.save();
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = 'bold 9px Inter';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+
+            let day = new Date(chartMin.getFullYear(), chartMin.getMonth(), chartMin.getDate());
+            while (day <= chartMax) {
+                const nextDay = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+                const dayStart = Math.max(day.getTime(), chartMin.getTime());
+                const dayEnd = Math.min(nextDay.getTime() - 1, chartMax.getTime());
+                const center = (xAxis.getPixelForValue(dayStart) + xAxis.getPixelForValue(dayEnd)) / 2;
+
+                const label = day.toLocaleDateString([], { weekday: 'narrow' });
+                ctx.fillText(label, center, yAxis.bottom + 3);
+
+                day = nextDay;
+            }
+            ctx.restore();
+        }
+    };
+
+    const overviewChart = new Chart(overviewCtx, {
+        type: 'bar',
+        plugins: [brushPlugin, overviewLabelsPlugin],
+        data: {
+            datasets: [{
+                label: 'Overview',
+                type: 'bar',
+                data: allHighLowBars,
+                borderColor: 'transparent',
+                backgroundColor: '#1b4968',
+                borderWidth: 0,
+                borderSkipped: false,
+                categoryPercentage: 1.0,
+                barPercentage: 1.0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            layout: { padding: { bottom: 15, left: 0, right: 0 } },
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    min: chartMin.getTime(),
+                    max: chartMax.getTime(),
+                    time: { unit: 'hour', displayFormats: { hour: 'HH:mm' } },
+                    display: true,
+                    grid: { drawBorder: false, drawTicks: false, drawOnChartArea: false, color: 'transparent' },
+                    offset: false,
+                    ticks: { display: false }
+                },
+                y: {
+                    display: true, // true so it takes up horizontal space
+                    min: 0,
+                    max: globalYMax > 0 ? Math.ceil(globalYMax * 1.1) : undefined,
+                    grid: { display: false, drawBorder: false },
+                    ticks: {
+                        color: 'transparent', // invisible text
+                        font: { size: 10, family: "Inter" },
+                        maxTicksLimit: 5,
+                        padding: 10 // match main chart Y padding
+                    },
+                    afterFit: function (axis) {
+                        axis.width = 40; // Must match main chart exactly
+                    }
+                }
+            },
+            interaction: { mode: 'none' }
+        }
+    });
+
+    // ── Brush drag interaction on the overview canvas ──
+    // Touch and mouse events are scoped entirely to the overview chart.
+    // The detail chart handles its own tooltip/HUD events independently.
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartMin = 0;
+
+    const getEventX = (e) => {
+        if (e.touches && e.touches.length > 0) return e.touches[0].clientX;
+        return e.clientX;
+    };
+
+    const onDragStart = (e) => {
+        isDragging = true;
+        dragStartX = getEventX(e);
+        dragStartMin = detailState.min;
+    };
+
+    const onDragMove = (e) => {
+        if (!isDragging) return;
+        // Prevent page scrolling while dragging the brush
+        if (e.cancelable) e.preventDefault();
+
+        const xAxis = overviewChart.scales.x;
+        const pxDelta = getEventX(e) - dragStartX;
+        // Convert pixel delta to time delta using the overview chart's scale
+        const timeDelta = (pxDelta / (xAxis.right - xAxis.left)) * (chartMax.getTime() - chartMin.getTime());
+
+        let newMin = dragStartMin + timeDelta;
+        let newMax = newMin + DETAIL_WINDOW_MS;
+
+        // Clamp to the global bounds
+        if (newMin < chartMin.getTime()) {
+            newMin = chartMin.getTime();
+            newMax = newMin + DETAIL_WINDOW_MS;
+        }
+        if (newMax > chartMax.getTime()) {
+            newMax = chartMax.getTime();
+            newMin = newMax - DETAIL_WINDOW_MS;
+        }
+
+        detailState.min = newMin;
+        detailState.max = newMax;
+
+        // Re-filter the detail chart's data to only include visible bars
+        chart.data.datasets[0].data = getVisibleBars();
+
+        // Update the detail chart's x-axis range and redraw
+        chart.options.scales.x.min = detailState.min;
+        chart.options.scales.x.max = detailState.max;
+        chart.update('none');
+
+        // Redraw the overview to update the brush overlay position
+        overviewChart.update('none');
+    };
+
+    const onDragEnd = () => {
+        isDragging = false;
+    };
+
+    overviewEl.addEventListener('mousedown', onDragStart);
+    overviewEl.addEventListener('touchstart', onDragStart, { passive: true });
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('touchmove', onDragMove, { passive: false });
+    window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('touchend', onDragEnd);
+}
