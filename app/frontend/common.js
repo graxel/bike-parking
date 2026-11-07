@@ -78,6 +78,16 @@ const STATUS = {
     none:   { color: "#64748b", label: "No data" },
 };
 
+// Trial colorblind-safe palette (mostly Okabe-Ito), enabled with ?palette=cb
+if (new URLSearchParams(location.search).get("palette") === "cb") {
+    Object.assign(STATUS.docks1, { color: "#830101" });
+    Object.assign(STATUS.docks2, { color: "#c68101" });
+    Object.assign(STATUS.docks3, { color: "#d0c304" });
+    Object.assign(STATUS.ok,     { color: "#02d313" });
+    Object.assign(STATUS.bikes3, { color: "#56b4e9" });
+    Object.assign(STATUS.bikes2, { color: "#cc79a7" });
+}
+
 function stationStatus(docks, bikes) {
     if (docks == null || bikes == null) return STATUS.none;
     if (docks <= 3) return STATUS[`docks${Math.max(0, docks)}`];

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup_scripts/deploy.sh
+# deployment/deploy-backend.sh
 # Universal deployment script for Local (Mac), QA (RPi), and Prod (RPi).
 set -euo pipefail
 

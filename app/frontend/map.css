@@ -85,8 +85,10 @@ html, body {
     flex-shrink: 0;
 }
 
+.legend .swatch { width: 16px; height: 16px; }
+
 .swatch-x {
-    width: 12px;
+    width: 16px;
     text-align: center;
     font-size: 0.8rem;
     font-weight: 700;
