@@ -279,7 +279,15 @@ html, body {
     .map-title h1 { font-size: 0.95rem; }
     .panel-link { margin-left: auto; }
     .leaflet-top.leaflet-left { top: 64px; }
-    .legend { top: auto; right: 16px; bottom: 120px; }
-    .legend { padding: 0.4rem 0.7rem; }
+    /* Sit just above the timeline (its height is measured in map.js) and
+       scroll rather than run under the title bar on short screens */
+    .legend {
+        top: auto;
+        right: 16px;
+        bottom: calc(var(--timeline-clear, 140px) + 12px);
+        max-height: calc(100% - var(--timeline-clear, 140px) - 12px - 76px);
+        overflow-y: auto;
+        padding: 0.4rem 0.7rem;
+    }
     .timeline { bottom: 12px; gap: 0.4rem; padding: 0.6rem; }
 }

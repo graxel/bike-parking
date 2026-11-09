@@ -52,7 +52,17 @@ const els = {
     speed: document.getElementById("speed-btn"),
     now: document.getElementById("now-btn"),
     toast: document.getElementById("toast"),
+    timeline: document.querySelector(".timeline"),
 };
+
+// Distance from the bottom of the window to the top of the timeline, so
+// the legend (on narrow screens) can sit just above it without overlapping
+function measureTimeline() {
+    const clear = window.innerHeight - els.timeline.getBoundingClientRect().top;
+    document.documentElement.style.setProperty("--timeline-clear", `${Math.ceil(clear)}px`);
+}
+new ResizeObserver(measureTimeline).observe(els.timeline);
+window.addEventListener("resize", measureTimeline);
 
 const nowPosition = () => state.times.length;
 
