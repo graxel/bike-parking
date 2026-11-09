@@ -126,10 +126,12 @@ html, body {
     max-width: 1100px;
     margin: 0 auto;
     display: flex;
-    align-items: center;
+    align-items: flex-end;  /* buttons line up with the tape, under the time label */
     gap: 0.6rem;
     padding: 0.7rem 0.9rem;
 }
+/* Vertically center the 40px buttons on the 68px tape */
+.timeline > .tl-play, .timeline > .tl-btn { margin-bottom: 14px; }
 .tl-btn {
     background: rgba(255, 255, 255, 0.08);
     border: 1px solid var(--panel-border);
@@ -177,14 +179,22 @@ html, body {
 .tl-btn.active { background: var(--accent-color); color: #0f172a; border-color: var(--accent-color); }
 .tl-speed { min-width: 48px; font-variant-numeric: tabular-nums; }
 .tl-main { flex: 1; min-width: 0; }
-/* Centered over the tape, so it sits right above the playhead */
+/* Centered over the tape, so it sits right above the playhead. The text may
+   spread past the tape (over the buttons), up to the panel's full width */
 .tl-label {
     position: relative;
+    display: flex;
+    justify-content: center;
     text-align: center;
     font-size: 1.2rem;
     font-weight: 700;
     margin-bottom: 0.35rem;
     font-variant-numeric: tabular-nums;
+}
+#time-label {
+    flex: none;
+    width: max-content;
+    max-width: min(calc(100vw - 64px), 1068px);
 }
 .tl-tape {
     position: relative;

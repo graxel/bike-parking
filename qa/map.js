@@ -8,7 +8,10 @@
  * Future predictions can later be appended as positions after H.
  */
 
-const CHUNK_SECONDS = 24 * 3600;
+// History loads newest-first in growing chunks: a small first one so play is
+// available quickly, then bigger ones so the whole history takes few requests
+const CHUNK_HOURS = [1, 2, 4, 8, 16];
+const CHUNK_MAX_HOURS = 24;  // every chunk after those
 // Playback pace as ms per 15 minutes of map time, so it's the same at any step size
 const SPEEDS = [
     { label: "1×", ms: 600 },
@@ -37,7 +40,8 @@ const state = {
     position: 0,
     playing: false,
     historyDone: false,   // preloadHistory has finished (successfully or not)
-    loadProgress: "",     // e.g. "Loading 7/9" while history chunks load
+    loadProgress: "",     // e.g. "◂ 15h · 7h ▸" while chunks load
+    chunkBounds: null,    // cached by chunkBounds()
     timer: null,
     speed: 0,
     hourly: new Map(),    // station id -> Promise of hourly series (card chart)
@@ -148,8 +152,26 @@ function valuesAt(frame, i) {
     return { docks: Number.isNaN(docks) ? null : docks, bikes: Number.isNaN(bikes) ? null : bikes };
 }
 
+// Chunk k covers the steps that are bounds[k] .. bounds[k+1]-1 back from the
+// newest past step
+function chunkBounds() {
+    if (state.chunkBounds?.n !== nowPosition()) {
+        const bounds = [0];
+        for (let i = 0; bounds.at(-1) < nowPosition(); i++) {
+            const hours = CHUNK_HOURS[i] ?? CHUNK_MAX_HOURS;
+            bounds.push(bounds.at(-1) + Math.max(1, Math.round(hours * 3600 / state.step)));
+        }
+        bounds[bounds.length - 1] = Math.min(bounds.at(-1), nowPosition());
+        state.chunkBounds = { n: nowPosition(), bounds };
+    }
+    return state.chunkBounds.bounds;
+}
+
 function chunkOf(pos) {
-    return Math.floor((nowPosition() - 1 - pos) / chunkSteps());
+    const back = nowPosition() - 1 - pos, bounds = chunkBounds();
+    let k = 0;
+    while (k < bounds.length - 2 && bounds[k + 1] <= back) k++;
+    return k;
 }
 
 // Past hour whose chunk has loaded but which has no frame (pipeline gap)
@@ -157,18 +179,28 @@ function isGap(pos) {
     return pos < nowPosition() && !frameAt(pos) && state.loadedChunks.has(chunkOf(pos));
 }
 
-function chunkSteps() {
-    return Math.max(1, Math.round(CHUNK_SECONDS / state.step));
+function chunkCount() {
+    return chunkBounds().length - 1;
 }
 
-function chunkCount() {
-    return Math.ceil(state.times.length / chunkSteps());
+// A loaded span, e.g. "6h" or "3d"
+function formatSpan(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+}
+
+// How far loaded data reaches each side of now: "◂ 15h · 7h ▸".
+// No forecasts on the map yet, so `ahead` is omitted until they exist.
+function loadedCaption(backSeconds, aheadSeconds = null) {
+    const back = `◂ ${formatSpan(backSeconds)}`;
+    return aheadSeconds == null ? back : `${back} · ${formatSpan(aheadSeconds)} ▸`;
 }
 
 function loadChunk(k) {
     if (!state.chunks.has(k)) {
-        const hi = nowPosition() - 1 - k * chunkSteps();
-        const lo = Math.max(0, hi - chunkSteps() + 1);
+        const bounds = chunkBounds();
+        const hi = nowPosition() - 1 - bounds[k];
+        const lo = Math.max(0, nowPosition() - bounds[k + 1]);
         const iso = t => new Date(t * 1000).toISOString();
         const p = fetchJson(`/map/snapshots/?start=${iso(state.times[lo])}&end=${iso(state.times[hi])}&${STEP_QUERY}`)
             .then(resp => {
@@ -189,10 +221,10 @@ function loadChunk(k) {
 async function preloadHistory() {
     const total = chunkCount();
     for (let k = 0; k < total; k++) {
-        state.loadProgress = `Loading ${k + 1}/${total}`;
-        renderPlayButton();
         try {
             await loadChunk(k);
+            state.loadProgress = loadedCaption(chunkBounds()[k + 1] * state.step);
+            renderPlayButton();
         } catch (err) {
             console.error("History chunk failed:", err);
             showToast(`Couldn't load part of the history: ${err.message}`);
