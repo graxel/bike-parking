@@ -61,6 +61,9 @@ html, body {
     right: 16px;
     padding: 0.6rem 0.9rem;
     font-size: 0.8rem;
+    /* Stop 12px above the timeline (measured in map.js); scroll if taller */
+    max-height: calc(100% - 16px - var(--timeline-clear, 140px) - 12px);
+    overflow-y: auto;
 }
 .legend summary {
     cursor: pointer;
