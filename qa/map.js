@@ -49,6 +49,7 @@ const els = {
     timeLabel: document.getElementById("time-label"),
     loadingLabel: document.getElementById("loading-label"),
     play: document.getElementById("play-btn"),
+    playNote: document.getElementById("play-note"),
     speed: document.getElementById("speed-btn"),
     now: document.getElementById("now-btn"),
     toast: document.getElementById("toast"),
@@ -233,7 +234,7 @@ function paint(frame) {
 
 function positionLabel(pos) {
     if (pos === nowPosition()) {
-        return state.nowFrame?.t ? `Now · ${formatWhen(state.nowFrame.t)}` : "Now";
+        return state.nowFrame?.t ? formatWhen(state.nowFrame.t) : "";
     }
     const label = formatWhen(state.times[pos]);
     return isGap(pos) ? `${label} · no data` : label;
@@ -434,6 +435,7 @@ function renderPlayButton() {
     els.play.classList.toggle("waiting", waiting);
     els.play.setAttribute("aria-disabled", unavailable);
     els.play.setAttribute("aria-label", waiting ? "Play (loading history)" : state.playing ? "Pause" : "Play");
+    els.playNote.textContent = waiting ? "Loading…" : unavailable ? "No history" : "";
     els.play.title = waiting ? "Loading history — play will be ready in a moment"
         : unavailable ? "No history to play"
         : "Play / pause (space)";

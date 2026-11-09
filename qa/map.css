@@ -143,6 +143,21 @@ html, body {
     flex-shrink: 0;
 }
 .tl-btn:hover { background: rgba(255, 255, 255, 0.16); }
+/* Caption under the play button explaining why it's unavailable;
+   absolutely positioned so it doesn't shift the timeline layout */
+.tl-play { position: relative; flex-shrink: 0; display: flex; }
+.tl-play-note {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    pointer-events: none;
+}
 /* Play at "now" before any history has loaded: spinner = "wait", not "broken" */
 .tl-btn.unavailable { cursor: not-allowed; opacity: 0.4; }
 .tl-btn.unavailable:hover { background: rgba(255, 255, 255, 0.08); }
