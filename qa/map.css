@@ -143,8 +143,23 @@ html, body {
     flex-shrink: 0;
 }
 .tl-btn:hover { background: rgba(255, 255, 255, 0.16); }
-.tl-btn:disabled { opacity: 0.35; cursor: default; }
-.tl-btn:disabled:hover { background: rgba(255, 255, 255, 0.08); }
+/* Play at "now" before any history has loaded: spinner = "wait", not "broken" */
+.tl-btn.unavailable { cursor: not-allowed; opacity: 0.4; }
+.tl-btn.unavailable:hover { background: rgba(255, 255, 255, 0.08); }
+.tl-btn.waiting { position: relative; color: transparent; cursor: progress; opacity: 1; }
+.tl-btn.waiting::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-secondary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: tl-spin 0.8s linear infinite;
+}
+@keyframes tl-spin { to { transform: rotate(360deg); } }
 .tl-btn.active { background: var(--accent-color); color: #0f172a; border-color: var(--accent-color); }
 .tl-speed { min-width: 48px; font-variant-numeric: tabular-nums; }
 .tl-main { flex: 1; min-width: 0; }

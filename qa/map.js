@@ -36,6 +36,7 @@ const state = {
     loadedChunks: new Set(),
     position: 0,
     playing: false,
+    historyDone: false,   // preloadHistory has finished (successfully or not)
     timer: null,
     speed: 0,
     hourly: new Map(),    // station id -> Promise of hourly series (card chart)
@@ -163,6 +164,7 @@ function loadChunk(k) {
                 alignFrames(resp).forEach(f => state.frames.set(f.t, f));
                 state.loadedChunks.add(k);
                 tape.render();  // refresh the loaded-data band
+                renderPlayButton();
             })
             .catch(err => {
                 state.chunks.delete(k);  // allow a retry
@@ -185,6 +187,8 @@ async function preloadHistory() {
         }
     }
     els.loadingLabel.textContent = "";
+    state.historyDone = true;
+    renderPlayButton();
 }
 
 function loadHourly(id) {
@@ -230,7 +234,7 @@ function showPosition(pos) {
     els.timeLabel.textContent = positionLabel(pos);
     els.tape.setAttribute("aria-valuetext", els.timeLabel.textContent);
     els.now.classList.toggle("active", pos === nowPosition());
-    els.play.disabled = pos >= nowPosition();
+    renderPlayButton();
 
     const frame = frameAt(pos);
     if (!frame && pos < nowPosition() && !state.loadedChunks.has(chunkOf(pos))) {
@@ -397,13 +401,49 @@ map.on("mouseout", () => { map.getContainer().style.cursor = ""; });
 /* ---------- playback ---------- */
 
 function setPlaying(on) {
-    if (on && state.position >= nowPosition()) on = false;  // nothing left to play
     state.playing = on;
     clearTimeout(state.timer);
-    els.play.textContent = on ? "❚❚" : "▶";
-    els.play.setAttribute("aria-label", on ? "Pause" : "Play");
-    els.play.classList.toggle("active", on);
-    if (on) schedule();
+    renderPlayButton();
+    if (on) {
+        if (state.position >= nowPosition()) tape.setPosition(playStartFromNow());
+        schedule();
+    }
+}
+
+// At "now" with no history loaded yet, there's nothing to play
+function playUnavailable() {
+    return !state.playing && state.position >= nowPosition() && playStartFromNow() >= nowPosition();
+}
+
+function renderPlayButton() {
+    const unavailable = playUnavailable();
+    const waiting = unavailable && !state.historyDone;
+    els.play.textContent = state.playing ? "❚❚" : "▶";
+    els.play.classList.toggle("active", state.playing);
+    els.play.classList.toggle("unavailable", unavailable);
+    els.play.classList.toggle("waiting", waiting);
+    els.play.setAttribute("aria-disabled", unavailable);
+    els.play.setAttribute("aria-label", waiting ? "Play (loading history)" : state.playing ? "Pause" : "Play");
+    els.play.title = waiting ? "Loading history — play will be ready in a moment"
+        : unavailable ? "No history to play"
+        : "Play / pause (space)";
+}
+
+function togglePlay() {
+    if (playUnavailable()) {
+        showToast(state.historyDone ? "No history to play." : "History is still loading — play will be ready in a moment.");
+        return;
+    }
+    setPlaying(!state.playing);
+}
+
+// Pressing play at "now": rewind to the earliest data loaded continuously
+// back from now, but no more than one day
+function playStartFromNow() {
+    const floor = Math.max(0, nowPosition() - Math.round(86400 / state.step));
+    let p = nowPosition();
+    while (p - 1 >= floor && (frameAt(p - 1) || isGap(p - 1))) p--;
+    return p;
 }
 
 function stepMs() {
@@ -444,7 +484,8 @@ function step(delta) {
     tape.setPosition(state.position + delta, { ms: 120 });
 }
 
-els.play.addEventListener("click", () => setPlaying(!state.playing));
+els.play.addEventListener("click", togglePlay);
+renderPlayButton();
 els.speed.addEventListener("click", () => {
     state.speed = (state.speed + 1) % SPEEDS.length;
     els.speed.textContent = SPEEDS[state.speed].label;
@@ -456,7 +497,7 @@ els.now.addEventListener("click", () => {
 document.addEventListener("keydown", e => {
     if (e.target.matches("input, textarea, button")) return;
     const stepBy = e.shiftKey ? 3600 / state.step : 1;  // Shift: one hour
-    if (e.code === "Space") { e.preventDefault(); setPlaying(!state.playing); }
+    if (e.code === "Space") { e.preventDefault(); togglePlay(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); step(-stepBy); }
     else if (e.key === "ArrowRight") { e.preventDefault(); step(stepBy); }
 });
