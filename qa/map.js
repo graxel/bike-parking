@@ -435,13 +435,17 @@ function playUnavailable() {
 function renderPlayButton() {
     const unavailable = playUnavailable();
     const waiting = unavailable && !state.historyDone;
-    els.play.textContent = state.playing ? "❚❚" : "▶";
+    // Only touch the glyph when it changes: replacing the text node under the
+    // pointer mid-click (this runs every playback step) swallows the click
+    const glyph = state.playing ? "❚❚" : "▶";
+    if (els.play.textContent !== glyph) els.play.textContent = glyph;
     els.play.classList.toggle("active", state.playing);
     els.play.classList.toggle("unavailable", unavailable);
     els.play.classList.toggle("waiting", waiting);
     els.play.setAttribute("aria-disabled", unavailable);
     els.play.setAttribute("aria-label", waiting ? "Play (loading history)" : state.playing ? "Pause" : "Play");
-    els.playNote.textContent = state.loadProgress || (waiting ? "Loading…" : unavailable ? "No history" : "");
+    const note = state.loadProgress || (waiting ? "Loading…" : unavailable ? "No history" : "");
+    if (els.playNote.textContent !== note) els.playNote.textContent = note;
     els.play.title = waiting ? "Loading history — play will be ready in a moment"
         : unavailable ? "No history to play"
         : "Play / pause (space)";
