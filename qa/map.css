@@ -62,7 +62,29 @@ html, body {
     padding: 0.6rem 0.9rem;
     font-size: 0.8rem;
 }
-.legend summary { cursor: pointer; font-weight: 600; color: var(--text-secondary); }
+.legend summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-secondary);
+    list-style: none;           /* hide the native marker (inconsistent on iOS Safari) */
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.2rem 0;          /* bigger tap target */
+    -webkit-tap-highlight-color: transparent;
+}
+.legend summary::-webkit-details-marker { display: none; }
+/* Our own disclosure triangle: points right when closed, down when open */
+.legend summary::before {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 6px solid currentColor;
+    border-top: 4.5px solid transparent;
+    border-bottom: 4.5px solid transparent;
+    transition: transform 0.15s;
+}
+.legend details[open] > summary::before { transform: rotate(90deg); }
 .layer-toggles {
     display: grid;
     gap: 0.3rem;
@@ -121,6 +143,8 @@ html, body {
     flex-shrink: 0;
 }
 .tl-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.tl-btn:disabled { opacity: 0.35; cursor: default; }
+.tl-btn:disabled:hover { background: rgba(255, 255, 255, 0.08); }
 .tl-btn.active { background: var(--accent-color); color: #0f172a; border-color: var(--accent-color); }
 .tl-speed { min-width: 48px; font-variant-numeric: tabular-nums; }
 .tl-main { flex: 1; min-width: 0; }

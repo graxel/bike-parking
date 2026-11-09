@@ -230,6 +230,7 @@ function showPosition(pos) {
     els.timeLabel.textContent = positionLabel(pos);
     els.tape.setAttribute("aria-valuetext", els.timeLabel.textContent);
     els.now.classList.toggle("active", pos === nowPosition());
+    els.play.disabled = pos >= nowPosition();
 
     const frame = frameAt(pos);
     if (!frame && pos < nowPosition() && !state.loadedChunks.has(chunkOf(pos))) {
@@ -258,9 +259,6 @@ function buildLegend() {
             ? `<li><span class="swatch-x">✕</span>${s.label}</li>`
             : `<li><span class="swatch" style="background:${s.color}"></span>${s.label}</li>`)
         .join("");
-    if (window.matchMedia("(max-width: 640px)").matches) {
-        document.getElementById("legend-details").open = false;
-    }
 }
 
 /* ---------- layer toggles ---------- */
@@ -399,15 +397,13 @@ map.on("mouseout", () => { map.getContainer().style.cursor = ""; });
 /* ---------- playback ---------- */
 
 function setPlaying(on) {
+    if (on && state.position >= nowPosition()) on = false;  // nothing left to play
     state.playing = on;
     clearTimeout(state.timer);
     els.play.textContent = on ? "❚❚" : "▶";
     els.play.setAttribute("aria-label", on ? "Pause" : "Play");
     els.play.classList.toggle("active", on);
-    if (on) {
-        if (state.position >= nowPosition()) tape.setPosition(0);
-        schedule();
-    }
+    if (on) schedule();
 }
 
 function stepMs() {
