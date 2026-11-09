@@ -37,6 +37,7 @@ const state = {
     position: 0,
     playing: false,
     historyDone: false,   // preloadHistory has finished (successfully or not)
+    loadProgress: "",     // e.g. "Loading 7/9" while history chunks load
     timer: null,
     speed: 0,
     hourly: new Map(),    // station id -> Promise of hourly series (card chart)
@@ -47,7 +48,6 @@ const state = {
 const els = {
     tape: document.getElementById("tape"),
     timeLabel: document.getElementById("time-label"),
-    loadingLabel: document.getElementById("loading-label"),
     play: document.getElementById("play-btn"),
     playNote: document.getElementById("play-note"),
     speed: document.getElementById("speed-btn"),
@@ -189,7 +189,8 @@ function loadChunk(k) {
 async function preloadHistory() {
     const total = chunkCount();
     for (let k = 0; k < total; k++) {
-        els.loadingLabel.textContent = `Loading history ${k + 1}/${total}…`;
+        state.loadProgress = `Loading ${k + 1}/${total}`;
+        renderPlayButton();
         try {
             await loadChunk(k);
         } catch (err) {
@@ -197,7 +198,7 @@ async function preloadHistory() {
             showToast(`Couldn't load part of the history: ${err.message}`);
         }
     }
-    els.loadingLabel.textContent = "";
+    state.loadProgress = "";
     state.historyDone = true;
     renderPlayButton();
 }
@@ -416,8 +417,13 @@ function setPlaying(on) {
     clearTimeout(state.timer);
     renderPlayButton();
     if (on) {
-        if (state.position >= nowPosition()) tape.setPosition(playStartFromNow());
-        schedule();
+        if (state.position >= nowPosition()) {
+            // Slide (not jump) back, so it's clear the tape can be dragged further
+            tape.setPosition(playStartFromNow(), { ms: REWIND_MS });
+            schedule(REWIND_MS + stepMs());
+        } else {
+            schedule();
+        }
     }
 }
 
@@ -435,7 +441,7 @@ function renderPlayButton() {
     els.play.classList.toggle("waiting", waiting);
     els.play.setAttribute("aria-disabled", unavailable);
     els.play.setAttribute("aria-label", waiting ? "Play (loading history)" : state.playing ? "Pause" : "Play");
-    els.playNote.textContent = waiting ? "Loading…" : unavailable ? "No history" : "";
+    els.playNote.textContent = state.loadProgress || (waiting ? "Loading…" : unavailable ? "No history" : "");
     els.play.title = waiting ? "Loading history — play will be ready in a moment"
         : unavailable ? "No history to play"
         : "Play / pause (space)";
@@ -457,6 +463,8 @@ function playStartFromNow() {
     while (p - 1 >= floor && (frameAt(p - 1) || isGap(p - 1))) p--;
     return p;
 }
+
+const REWIND_MS = 800;
 
 function stepMs() {
     return SPEEDS[state.speed].ms * (state.step / 900);

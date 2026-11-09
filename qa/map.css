@@ -149,8 +149,7 @@ html, body {
 .tl-play-note {
     position: absolute;
     top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 2px;
     margin-top: 4px;
     font-size: 0.65rem;
     font-weight: 600;
@@ -186,15 +185,6 @@ html, body {
     font-weight: 700;
     margin-bottom: 0.35rem;
     font-variant-numeric: tabular-nums;
-}
-.tl-loading {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-secondary);
-    font-weight: 400;
-    font-size: 0.78rem;
 }
 .tl-tape {
     position: relative;
@@ -289,7 +279,6 @@ html, body {
 
 @media (max-width: 640px) {
     .tl-label { font-size: 1rem; }
-    .tl-loading { display: none; }  /* no room beside the centered time */
     .map-title { left: 16px; right: 16px; top: 12px; padding: 0.5rem 0.8rem; }
     .map-title h1 { font-size: 0.95rem; }
     .panel-link { margin-left: auto; }
