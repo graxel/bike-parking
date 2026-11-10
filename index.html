@@ -31,10 +31,13 @@
     </div>
 
     <div class="panel timeline">
-        <button id="play-btn" class="tl-btn" title="Play / pause (space)" aria-label="Play">▶</button>
+        <div class="tl-play">
+            <button id="play-btn" class="tl-btn" title="Play / pause (space)" aria-label="Play">▶</button>
+            <span id="play-note" class="tl-play-note" aria-live="polite"></span>
+        </div>
         <button id="speed-btn" class="tl-btn tl-speed" title="Playback speed">1×</button>
         <div class="tl-main">
-            <div class="tl-label"><span id="time-label">Loading…</span><span id="loading-label" class="tl-loading"></span></div>
+            <div class="tl-label"><span id="time-label">&nbsp;</span></div>
             <div id="tape" class="tl-tape" tabindex="0" role="slider" aria-label="Time">
                 <canvas></canvas>
                 <div class="tl-playhead"></div>
