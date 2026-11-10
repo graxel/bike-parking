@@ -8,7 +8,10 @@
  * Future predictions can later be appended as positions after H.
  */
 
-const CHUNK_SECONDS = 24 * 3600;
+// History loads newest-first in growing chunks: a small first one so play is
+// available quickly, then bigger ones so the whole history takes few requests
+const CHUNK_HOURS = [1, 2, 4, 8, 16];
+const CHUNK_MAX_HOURS = 24;  // every chunk after those
 // Playback pace as ms per 15 minutes of map time, so it's the same at any step size
 const SPEEDS = [
     { label: "1×", ms: 600 },
@@ -36,6 +39,9 @@ const state = {
     loadedChunks: new Set(),
     position: 0,
     playing: false,
+    historyDone: false,   // preloadHistory has finished (successfully or not)
+    loadProgress: "",     // e.g. "◂ 15h · 7h ▸" while chunks load
+    chunkBounds: null,    // cached by chunkBounds()
     timer: null,
     speed: 0,
     hourly: new Map(),    // station id -> Promise of hourly series (card chart)
@@ -46,12 +52,22 @@ const state = {
 const els = {
     tape: document.getElementById("tape"),
     timeLabel: document.getElementById("time-label"),
-    loadingLabel: document.getElementById("loading-label"),
     play: document.getElementById("play-btn"),
+    playNote: document.getElementById("play-note"),
     speed: document.getElementById("speed-btn"),
     now: document.getElementById("now-btn"),
     toast: document.getElementById("toast"),
+    timeline: document.querySelector(".timeline"),
 };
+
+// Distance from the bottom of the window to the top of the timeline, so
+// the legend (on narrow screens) can sit just above it without overlapping
+function measureTimeline() {
+    const clear = window.innerHeight - els.timeline.getBoundingClientRect().top;
+    document.documentElement.style.setProperty("--timeline-clear", `${Math.ceil(clear)}px`);
+}
+new ResizeObserver(measureTimeline).observe(els.timeline);
+window.addEventListener("resize", measureTimeline);
 
 const nowPosition = () => state.times.length;
 
@@ -136,8 +152,26 @@ function valuesAt(frame, i) {
     return { docks: Number.isNaN(docks) ? null : docks, bikes: Number.isNaN(bikes) ? null : bikes };
 }
 
+// Chunk k covers the steps that are bounds[k] .. bounds[k+1]-1 back from the
+// newest past step
+function chunkBounds() {
+    if (state.chunkBounds?.n !== nowPosition()) {
+        const bounds = [0];
+        for (let i = 0; bounds.at(-1) < nowPosition(); i++) {
+            const hours = CHUNK_HOURS[i] ?? CHUNK_MAX_HOURS;
+            bounds.push(bounds.at(-1) + Math.max(1, Math.round(hours * 3600 / state.step)));
+        }
+        bounds[bounds.length - 1] = Math.min(bounds.at(-1), nowPosition());
+        state.chunkBounds = { n: nowPosition(), bounds };
+    }
+    return state.chunkBounds.bounds;
+}
+
 function chunkOf(pos) {
-    return Math.floor((nowPosition() - 1 - pos) / chunkSteps());
+    const back = nowPosition() - 1 - pos, bounds = chunkBounds();
+    let k = 0;
+    while (k < bounds.length - 2 && bounds[k + 1] <= back) k++;
+    return k;
 }
 
 // Past hour whose chunk has loaded but which has no frame (pipeline gap)
@@ -145,24 +179,35 @@ function isGap(pos) {
     return pos < nowPosition() && !frameAt(pos) && state.loadedChunks.has(chunkOf(pos));
 }
 
-function chunkSteps() {
-    return Math.max(1, Math.round(CHUNK_SECONDS / state.step));
+function chunkCount() {
+    return chunkBounds().length - 1;
 }
 
-function chunkCount() {
-    return Math.ceil(state.times.length / chunkSteps());
+// A loaded span, e.g. "6h" or "3d"
+function formatSpan(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    return hours < 48 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+}
+
+// How far loaded data reaches each side of now: "◂ 15h · 7h ▸".
+// No forecasts on the map yet, so `ahead` is omitted until they exist.
+function loadedCaption(backSeconds, aheadSeconds = null) {
+    const back = `◂ ${formatSpan(backSeconds)}`;
+    return aheadSeconds == null ? back : `${back} · ${formatSpan(aheadSeconds)} ▸`;
 }
 
 function loadChunk(k) {
     if (!state.chunks.has(k)) {
-        const hi = nowPosition() - 1 - k * chunkSteps();
-        const lo = Math.max(0, hi - chunkSteps() + 1);
+        const bounds = chunkBounds();
+        const hi = nowPosition() - 1 - bounds[k];
+        const lo = Math.max(0, nowPosition() - bounds[k + 1]);
         const iso = t => new Date(t * 1000).toISOString();
         const p = fetchJson(`/map/snapshots/?start=${iso(state.times[lo])}&end=${iso(state.times[hi])}&${STEP_QUERY}`)
             .then(resp => {
                 alignFrames(resp).forEach(f => state.frames.set(f.t, f));
                 state.loadedChunks.add(k);
                 tape.render();  // refresh the loaded-data band
+                renderPlayButton();
             })
             .catch(err => {
                 state.chunks.delete(k);  // allow a retry
@@ -176,15 +221,18 @@ function loadChunk(k) {
 async function preloadHistory() {
     const total = chunkCount();
     for (let k = 0; k < total; k++) {
-        els.loadingLabel.textContent = `Loading history ${k + 1}/${total}…`;
         try {
             await loadChunk(k);
+            state.loadProgress = loadedCaption(chunkBounds()[k + 1] * state.step);
+            renderPlayButton();
         } catch (err) {
             console.error("History chunk failed:", err);
             showToast(`Couldn't load part of the history: ${err.message}`);
         }
     }
-    els.loadingLabel.textContent = "";
+    state.loadProgress = "";
+    state.historyDone = true;
+    renderPlayButton();
 }
 
 function loadHourly(id) {
@@ -219,7 +267,7 @@ function paint(frame) {
 
 function positionLabel(pos) {
     if (pos === nowPosition()) {
-        return state.nowFrame?.t ? `Now · ${formatWhen(state.nowFrame.t)}` : "Now";
+        return state.nowFrame?.t ? formatWhen(state.nowFrame.t) : "";
     }
     const label = formatWhen(state.times[pos]);
     return isGap(pos) ? `${label} · no data` : label;
@@ -230,6 +278,7 @@ function showPosition(pos) {
     els.timeLabel.textContent = positionLabel(pos);
     els.tape.setAttribute("aria-valuetext", els.timeLabel.textContent);
     els.now.classList.toggle("active", pos === nowPosition());
+    renderPlayButton();
 
     const frame = frameAt(pos);
     if (!frame && pos < nowPosition() && !state.loadedChunks.has(chunkOf(pos))) {
@@ -258,9 +307,6 @@ function buildLegend() {
             ? `<li><span class="swatch-x">✕</span>${s.label}</li>`
             : `<li><span class="swatch" style="background:${s.color}"></span>${s.label}</li>`)
         .join("");
-    if (window.matchMedia("(max-width: 640px)").matches) {
-        document.getElementById("legend-details").open = false;
-    }
 }
 
 /* ---------- layer toggles ---------- */
@@ -401,14 +447,60 @@ map.on("mouseout", () => { map.getContainer().style.cursor = ""; });
 function setPlaying(on) {
     state.playing = on;
     clearTimeout(state.timer);
-    els.play.textContent = on ? "❚❚" : "▶";
-    els.play.setAttribute("aria-label", on ? "Pause" : "Play");
-    els.play.classList.toggle("active", on);
+    renderPlayButton();
     if (on) {
-        if (state.position >= nowPosition()) tape.setPosition(0);
-        schedule();
+        if (state.position >= nowPosition()) {
+            // Slide (not jump) back, so it's clear the tape can be dragged further
+            tape.setPosition(playStartFromNow(), { ms: REWIND_MS });
+            schedule(REWIND_MS + stepMs());
+        } else {
+            schedule();
+        }
     }
 }
+
+// At "now" with no history loaded yet, there's nothing to play
+function playUnavailable() {
+    return !state.playing && state.position >= nowPosition() && playStartFromNow() >= nowPosition();
+}
+
+function renderPlayButton() {
+    const unavailable = playUnavailable();
+    const waiting = unavailable && !state.historyDone;
+    // Only touch the glyph when it changes: replacing the text node under the
+    // pointer mid-click (this runs every playback step) swallows the click
+    const glyph = state.playing ? "❚❚" : "▶";
+    if (els.play.textContent !== glyph) els.play.textContent = glyph;
+    els.play.classList.toggle("active", state.playing);
+    els.play.classList.toggle("unavailable", unavailable);
+    els.play.classList.toggle("waiting", waiting);
+    els.play.setAttribute("aria-disabled", unavailable);
+    els.play.setAttribute("aria-label", waiting ? "Play (loading history)" : state.playing ? "Pause" : "Play");
+    const note = state.loadProgress || (waiting ? "Loading…" : unavailable ? "No history" : "");
+    if (els.playNote.textContent !== note) els.playNote.textContent = note;
+    els.play.title = waiting ? "Loading history — play will be ready in a moment"
+        : unavailable ? "No history to play"
+        : "Play / pause (space)";
+}
+
+function togglePlay() {
+    if (playUnavailable()) {
+        showToast(state.historyDone ? "No history to play." : "History is still loading — play will be ready in a moment.");
+        return;
+    }
+    setPlaying(!state.playing);
+}
+
+// Pressing play at "now": rewind to the earliest data loaded continuously
+// back from now, but no more than one day
+function playStartFromNow() {
+    const floor = Math.max(0, nowPosition() - Math.round(86400 / state.step));
+    let p = nowPosition();
+    while (p - 1 >= floor && (frameAt(p - 1) || isGap(p - 1))) p--;
+    return p;
+}
+
+const REWIND_MS = 800;
 
 function stepMs() {
     return SPEEDS[state.speed].ms * (state.step / 900);
@@ -448,7 +540,8 @@ function step(delta) {
     tape.setPosition(state.position + delta, { ms: 120 });
 }
 
-els.play.addEventListener("click", () => setPlaying(!state.playing));
+els.play.addEventListener("click", togglePlay);
+renderPlayButton();
 els.speed.addEventListener("click", () => {
     state.speed = (state.speed + 1) % SPEEDS.length;
     els.speed.textContent = SPEEDS[state.speed].label;
@@ -460,7 +553,7 @@ els.now.addEventListener("click", () => {
 document.addEventListener("keydown", e => {
     if (e.target.matches("input, textarea, button")) return;
     const stepBy = e.shiftKey ? 3600 / state.step : 1;  // Shift: one hour
-    if (e.code === "Space") { e.preventDefault(); setPlaying(!state.playing); }
+    if (e.code === "Space") { e.preventDefault(); togglePlay(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); step(-stepBy); }
     else if (e.key === "ArrowRight") { e.preventDefault(); step(stepBy); }
 });

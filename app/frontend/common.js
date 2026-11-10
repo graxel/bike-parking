@@ -103,7 +103,7 @@ const fmtDate = new Intl.DateTimeFormat("en-US", { timeZone: NYC_TZ, weekday: "s
 
 // "Mon, Nov 2 at 5:10 PM"
 function formatWhen(epochSec) {
-    return `${fmtDate.format(epochSec * 1000)} at ${fmtTime.format(epochSec * 1000)}`;
+    return `${fmtDate.format(epochSec * 1000)} · ${fmtTime.format(epochSec * 1000)}`;
 }
 const fmtDayShort = new Intl.DateTimeFormat("en-US", { timeZone: NYC_TZ, weekday: "short", day: "numeric" });
 const fmtHour24 = new Intl.DateTimeFormat("en-US", { timeZone: NYC_TZ, hour: "numeric", hourCycle: "h23" });
